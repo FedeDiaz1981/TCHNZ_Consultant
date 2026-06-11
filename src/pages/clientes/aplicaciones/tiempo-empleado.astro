@@ -1,0 +1,742 @@
+﻿---
+import EmployeeTimeApp from "../../../components/portal/EmployeeTimeApp.jsx";
+import { getCustomerLocale } from "../../../lib/i18n/customers";
+import { moduleRequiresAuth } from "../../../lib/portal/modules";
+
+const user = Astro.locals.user;
+const supabase = Astro.locals.supabase;
+const portalModule = Astro.locals.portalModule;
+
+if (!supabase) {
+  return Astro.redirect("/consultant/login");
+}
+
+const requiresAuth = moduleRequiresAuth(portalModule);
+const userEmail = requiresAuth ? user?.email ?? "" : "";
+const locale = getCustomerLocale(Astro.url, Astro.cookies);
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{locale === "en" ? "Employee Time | Technized Consultant" : "Tiempo de Empleado | Technized Consultant"}</title>
+    <meta
+      name="description"
+      content={locale === "en"
+        ? "Private application for processing employee attendance and absence records."
+        : "Aplicacion privada para procesar presencias y ausencias de empleados."}
+    />
+    <link rel="icon" href="/consultant/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style is:global>
+      :root {
+        --emp-bg: #09070d;
+        --emp-bg2: #120d18;
+        --emp-panel: rgba(24, 16, 30, 0.74);
+        --emp-panel-2: rgba(20, 14, 26, 0.78);
+        --emp-stroke: rgba(255, 255, 255, 0.08);
+        --emp-stroke-soft: rgba(255, 255, 255, 0.05);
+        --emp-text: #f4f1f8;
+        --emp-muted: #9f97ab;
+        --emp-accent: #f49a2f;
+        --emp-accent-2: #d97b1b;
+        --emp-accent-soft: rgba(244, 154, 47, 0.14);
+        --emp-shadow: 0 12px 50px rgba(0, 0, 0, 0.35);
+        --emp-radius: 22px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+      }
+
+      body.emp-time-body {
+        margin: 0;
+        font-family: "Inter", system-ui, sans-serif;
+        color: var(--emp-text);
+        background:
+          radial-gradient(60% 80% at 50% 18%, rgba(92, 36, 15, 0.22), transparent 55%),
+          radial-gradient(35% 30% at 50% 48%, rgba(244, 154, 47, 0.1), transparent 60%),
+          linear-gradient(180deg, #140d1d 0%, #09070d 100%);
+        overflow-x: hidden;
+      }
+
+      body.emp-time-body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(90deg, rgba(255, 255, 255, 0.02) 0 1px, transparent 1px 100%),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.01) 0 1px, transparent 1px 100%);
+        background-size: 100px 100px, 100px 100px;
+        opacity: 0.08;
+        mix-blend-mode: soft-light;
+      }
+
+      .emp-page {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 36px 24px 44px;
+        position: relative;
+        z-index: 1;
+      }
+
+      .emp-topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 52px;
+        padding-bottom: 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        gap: 16px;
+      }
+
+      .emp-brand-box {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        min-width: 338px;
+        height: 54px;
+        padding: 0 18px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .emp-brand-box:focus-visible,
+      .emp-dropzone:focus-visible,
+      .emp-btn:focus-visible,
+      .emp-btn--secondary:focus-visible {
+        outline: 2px solid rgba(244, 154, 47, 0.9);
+        outline-offset: 3px;
+      }
+
+      .emp-menu {
+        width: 18px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .emp-menu span {
+        display: block;
+        height: 2px;
+        border-radius: 999px;
+        background: #ddd7e8;
+        opacity: 0.88;
+      }
+
+      .emp-crumb {
+        font-size: 13px;
+        color: #7f7690;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-left: 2px;
+      }
+
+      .emp-brand-name {
+        font-size: 18px;
+        font-weight: 500;
+        color: #d8d1e1;
+        letter-spacing: 0.01em;
+      }
+
+      .emp-close-x {
+        margin-left: auto;
+        color: var(--emp-accent);
+        font-size: 18px;
+        font-weight: 600;
+        line-height: 1;
+      }
+
+      .emp-client-mail {
+        font-size: 16px;
+        font-weight: 600;
+        color: #efe9f7;
+        letter-spacing: 0.01em;
+      }
+
+      .emp-client-mail b {
+        color: var(--emp-accent);
+        font-weight: 700;
+      }
+
+      .emp-hero {
+        text-align: center;
+        margin-bottom: 28px;
+      }
+
+      .emp-eyebrow {
+        color: var(--emp-accent);
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.28em;
+        margin-bottom: 14px;
+        text-transform: uppercase;
+      }
+
+      .emp-page h1 {
+        margin: 0;
+        font-size: 58px;
+        line-height: 1.05;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+        text-wrap: balance;
+      }
+
+      .emp-subtitle {
+        margin: 18px auto 0;
+        max-width: 760px;
+        color: var(--emp-muted);
+        font-size: 16px;
+        line-height: 1.6;
+        font-weight: 500;
+      }
+
+      .emp-panel {
+        background:
+          radial-gradient(50% 120% at 25% 0%, rgba(244, 154, 47, 0.1), transparent 52%),
+          linear-gradient(180deg, rgba(28, 20, 34, 0.88), rgba(18, 12, 24, 0.84));
+        border: 1px solid var(--emp-stroke);
+        border-radius: var(--emp-radius);
+        box-shadow: var(--emp-shadow);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+      }
+
+      .emp-stepper {
+        margin: 30px auto 32px;
+        padding: 24px 34px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+      }
+
+      .emp-step {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        min-width: 0;
+        flex: 1 1 0;
+      }
+
+      .emp-step:last-child {
+        flex: 0 0 auto;
+      }
+
+      .emp-step-line {
+        flex: 1;
+        height: 2px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, rgba(244, 154, 47, 0.85), rgba(244, 154, 47, 0.25));
+        box-shadow: 0 0 16px rgba(244, 154, 47, 0.28);
+      }
+
+      .emp-step.pending .emp-step-line {
+        background: rgba(255, 255, 255, 0.12);
+        box-shadow: none;
+      }
+
+      .emp-step-dot {
+        width: 34px;
+        height: 34px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        font-size: 18px;
+        font-weight: 800;
+        flex: 0 0 auto;
+      }
+
+      .emp-step.active .emp-step-dot {
+        background: var(--emp-accent);
+        color: #1a0f06;
+      }
+
+      .emp-step.current .emp-step-dot {
+        border: 2px solid var(--emp-accent);
+        color: var(--emp-accent);
+        background: rgba(244, 154, 47, 0.08);
+        box-shadow: 0 0 18px rgba(244, 154, 47, 0.18);
+      }
+
+      .emp-step.pending .emp-step-dot {
+        border: 2px solid rgba(255, 255, 255, 0.18);
+        color: #8d8598;
+        background: transparent;
+      }
+
+      .emp-step-label {
+        font-size: 23px;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        white-space: nowrap;
+      }
+
+      .emp-step.active .emp-step-label,
+      .emp-step.current .emp-step-label {
+        color: #f4f0f7;
+      }
+
+      .emp-step.pending .emp-step-label {
+        color: #cfc8d7;
+      }
+
+      .emp-upload-card {
+        padding: 28px;
+        margin-bottom: 20px;
+      }
+
+      .emp-dropzone {
+        min-height: 316px;
+        border-radius: 20px;
+        border: 2px dashed rgba(244, 154, 47, 0.68);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 40px 24px;
+        background:
+          radial-gradient(60% 120% at 20% 20%, rgba(244, 154, 47, 0.18), transparent 45%),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.015), rgba(255, 255, 255, 0.01));
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.02),
+          0 0 30px rgba(244, 154, 47, 0.07);
+        cursor: pointer;
+        transition: transform 0.18s ease, border-color 0.18s ease, background-color 0.18s ease;
+      }
+
+      .emp-dropzone:hover,
+      .emp-dropzone.is-dragging {
+        transform: translateY(-1px);
+        border-color: rgba(244, 154, 47, 0.92);
+        background:
+          radial-gradient(60% 120% at 20% 20%, rgba(244, 154, 47, 0.22), transparent 45%),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(255, 255, 255, 0.012));
+      }
+
+      .emp-upload-icon {
+        width: 78px;
+        height: 78px;
+        border: 3px solid var(--emp-accent);
+        border-radius: 18px;
+        position: relative;
+        margin-bottom: 28px;
+        opacity: 0.92;
+      }
+
+      .emp-upload-icon::before {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 18px;
+        width: 4px;
+        height: 28px;
+        transform: translateX(-50%);
+        background: var(--emp-accent);
+        border-radius: 999px;
+      }
+
+      .emp-upload-icon::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 15px;
+        width: 16px;
+        height: 16px;
+        border-left: 4px solid var(--emp-accent);
+        border-top: 4px solid var(--emp-accent);
+        transform: translateX(-50%) rotate(45deg);
+        transform-origin: center;
+      }
+
+      .emp-upload-text {
+        max-width: 760px;
+        font-size: 20px;
+        line-height: 1.45;
+        color: #efeaf5;
+        margin-bottom: 28px;
+        letter-spacing: -0.01em;
+        word-break: break-word;
+      }
+
+      .emp-btn,
+      .emp-btn--secondary {
+        border: none;
+        color: #fff8f0;
+        font-size: 17px;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        padding: 16px 32px;
+        border-radius: 12px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        cursor: pointer;
+      }
+
+      .emp-btn {
+        background: linear-gradient(180deg, #f8a63c, #eb7f18);
+        box-shadow: 0 12px 28px rgba(233, 126, 23, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+      }
+
+      .emp-btn:disabled {
+        opacity: 0.8;
+        cursor: wait;
+      }
+
+      .emp-btn--secondary {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        color: #cfc9d8;
+      }
+
+      .emp-arrow {
+        font-size: 22px;
+        line-height: 1;
+        margin-top: -1px;
+      }
+
+      .emp-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+
+      .emp-stat {
+        min-height: 88px;
+        padding: 18px 22px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        background: linear-gradient(180deg, rgba(28, 20, 34, 0.86), rgba(18, 12, 24, 0.82));
+        border: 1px solid var(--emp-stroke-soft);
+        border-radius: 18px;
+        box-shadow: var(--emp-shadow);
+      }
+
+      .emp-stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(255, 255, 255, 0.02);
+        color: var(--emp-accent);
+        flex: 0 0 auto;
+      }
+
+      .emp-icon-svg {
+        display: inline-flex;
+        width: 22px;
+        height: 22px;
+      }
+
+      .emp-icon-svg--monitor {
+        width: 34px;
+        height: 34px;
+      }
+
+      .emp-stat-value {
+        font-size: 20px;
+        font-weight: 800;
+        margin-right: 4px;
+        color: #f8f4fb;
+        min-width: 18px;
+      }
+
+      .emp-stat-label {
+        font-size: 18px;
+        font-weight: 500;
+        color: #ddd6e6;
+        letter-spacing: -0.01em;
+      }
+
+      .emp-bottom {
+        min-height: 130px;
+        padding: 16px 18px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+      }
+
+      .emp-waiting-card {
+        width: 270px;
+        min-height: 98px;
+        border-radius: 18px;
+        border: 2px dashed rgba(212, 148, 89, 0.35);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        background: rgba(255, 255, 255, 0.01);
+      }
+
+      .emp-monitor-icon {
+        color: #7b5b45;
+        opacity: 0.9;
+      }
+
+      .emp-waiting-text {
+        font-size: 18px;
+        color: #f0ebf5;
+        font-weight: 500;
+      }
+
+      .emp-system-area {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        justify-content: center;
+        gap: 16px;
+        padding-right: 6px;
+      }
+
+      .emp-system-title {
+        color: #9a92a7;
+        letter-spacing: 0.36em;
+        text-transform: uppercase;
+        font-size: 13px;
+        white-space: nowrap;
+      }
+
+      .emp-system-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 18px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        background: rgba(255, 255, 255, 0.03);
+        color: #cfc9d8;
+        font-size: 14px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      .emp-system-badge::before {
+        content: "";
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+        background: var(--emp-accent);
+        box-shadow: 0 0 12px rgba(244, 154, 47, 0.45);
+        flex: 0 0 auto;
+      }
+
+      .emp-log-panel {
+        margin-top: 18px;
+        background: linear-gradient(180deg, rgba(28, 20, 34, 0.86), rgba(18, 12, 24, 0.82));
+        border: 1px solid var(--emp-stroke-soft);
+        border-radius: 18px;
+        box-shadow: var(--emp-shadow);
+        overflow: hidden;
+      }
+
+      .emp-log-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 14px 18px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        font-size: 13px;
+        font-weight: 700;
+        color: #e5ddeb;
+      }
+
+      .emp-log-body {
+        max-height: 240px;
+        overflow-y: auto;
+        padding: 14px 18px;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      .emp-log-row {
+        display: flex;
+        gap: 12px;
+        color: #e7e0ef;
+        margin-bottom: 6px;
+      }
+
+      .emp-log-row--error {
+        color: #ff8f8f;
+      }
+
+      .emp-log-row--success {
+        color: #86efac;
+      }
+
+      .emp-log-time {
+        color: #8d8598;
+        flex: 0 0 auto;
+      }
+
+      .emp-log-actions {
+        display: flex;
+        justify-content: flex-end;
+        padding: 0 18px 18px;
+      }
+
+      @media (max-width: 1100px) {
+        .emp-page h1 {
+          font-size: 48px;
+        }
+
+        .emp-step-label {
+          font-size: 20px;
+        }
+      }
+
+      @media (max-width: 860px) {
+        .emp-topbar {
+          flex-direction: column;
+          gap: 16px;
+          align-items: stretch;
+        }
+
+        .emp-brand-box {
+          min-width: 0;
+          width: 100%;
+        }
+
+        .emp-client-mail {
+          text-align: right;
+        }
+
+        .emp-page h1 {
+          font-size: 40px;
+        }
+
+        .emp-stepper {
+          padding: 18px 20px;
+          gap: 10px;
+        }
+
+        .emp-step-label {
+          font-size: 18px;
+        }
+
+        .emp-stats {
+          grid-template-columns: 1fr;
+        }
+
+        .emp-bottom {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .emp-waiting-card {
+          width: 100%;
+        }
+
+        .emp-system-area {
+          align-items: flex-start;
+          padding-right: 0;
+        }
+      }
+
+      @media (max-width: 620px) {
+        .emp-page {
+          padding: 22px 14px 28px;
+        }
+
+        .emp-hero {
+          margin-bottom: 22px;
+        }
+
+        .emp-page h1 {
+          font-size: 32px;
+          line-height: 1.1;
+        }
+
+        .emp-subtitle {
+          font-size: 14px;
+        }
+
+        .emp-stepper {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .emp-step {
+          width: 100%;
+        }
+
+        .emp-step:last-child {
+          flex: 1 1 auto;
+        }
+
+        .emp-step-line {
+          min-width: 30px;
+        }
+
+        .emp-upload-card {
+          padding: 16px;
+        }
+
+        .emp-dropzone {
+          min-height: 260px;
+          padding: 28px 18px;
+        }
+
+        .emp-upload-text {
+          font-size: 17px;
+        }
+
+        .emp-btn,
+        .emp-btn--secondary {
+          width: 100%;
+        }
+
+        .emp-stat {
+          padding: 16px;
+        }
+
+        .emp-stat-label {
+          font-size: 16px;
+        }
+
+        .emp-client-mail {
+          font-size: 14px;
+          word-break: break-word;
+        }
+
+        .emp-log-actions {
+          padding: 0 14px 14px;
+        }
+      }
+    </style>
+  </head>
+  <body class="emp-time-body">
+    <EmployeeTimeApp client:load userEmail={userEmail} locale={locale} />
+  </body>
+</html>

@@ -1,0 +1,451 @@
+---
+import PortalLayout from "../../layouts/PortalLayout.astro";
+import {
+  getCustomerIntlLocale,
+  getCustomerLocale,
+  getCustomerUi
+} from "../../lib/i18n/customers";
+import { getCurrentPortalClient, getPortalBlogPosts } from "../../lib/portal/client-access";
+import { getSectionHrefForPath } from "../../lib/portal/hosts";
+import {
+  getModuleContentSection,
+  moduleRequiresAuth
+} from "../../lib/portal/modules";
+
+const user = Astro.locals.user;
+const supabase = Astro.locals.supabase;
+const portalModule = Astro.locals.portalModule;
+
+if (!supabase) {
+  return Astro.redirect("/consultant/login");
+}
+
+const locale = getCustomerLocale(Astro.url, Astro.cookies);
+const ui = getCustomerUi(locale).blogList;
+const requiresAuth = moduleRequiresAuth(portalModule);
+const contentSection = getModuleContentSection(portalModule) ?? "blog";
+const currentClient =
+  requiresAuth && user ? await getCurrentPortalClient(supabase, user.id, portalModule) : null;
+const posts = await getPortalBlogPosts(supabase, portalModule, contentSection);
+
+function truncateText(value: string, limit: number) {
+  if (value.length <= limit) return value;
+  return `${value.slice(0, limit).trimEnd()}...`;
+}
+
+function stripHtml(value: string) {
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function formatDateLabel(value: string | null) {
+  if (!value) return ui.recentPublication;
+
+  return new Intl.DateTimeFormat(getCustomerIntlLocale(locale), {
+    day: "2-digit",
+    month: "long",
+    year: "numeric"
+  }).format(new Date(value));
+}
+
+const normalizedPosts = posts.map((post) => ({
+  ...post,
+  summaryText: post.summary
+    ? stripHtml(post.summary)
+    : truncateText(stripHtml(post.content), 180),
+  dateLabel: formatDateLabel(post.publishedAt ?? post.createdAt),
+  searchIndex: `${post.title} ${post.authorName} ${stripHtml(post.summary ?? "")} ${stripHtml(post.content)} ${post.tags.join(" ")}`
+    .toLowerCase()
+    .trim()
+}));
+
+const featuredPost = normalizedPosts.find((post) => post.isFeatured) ?? normalizedPosts[0] ?? null;
+const remainingPosts = normalizedPosts.filter((post) => post.id !== featuredPost?.id);
+
+function getPostHref(slug: string) {
+  return getSectionHrefForPath(Astro.url, `/clientes/blog/${slug}`);
+}
+---
+
+<PortalLayout
+  title={`${ui.title} | ${currentClient?.name ?? "Technized"}`}
+  description={ui.description}
+  userEmail={user?.email ?? ""}
+  activePath="/clientes/blog"
+  clientName={currentClient?.name ?? ""}
+  clientLogoUrl={currentClient?.logoUrl ?? ""}
+  locale={locale}
+  portalModule={portalModule}
+>
+  <section class="portal-panel rounded-[32px] p-6 md:p-8">
+    <div class="portal-blog-hero">
+      <div>
+        <p class="portal-eyebrow">{ui.eyebrow}</p>
+        <h2 class="mt-3 text-4xl font-semibold text-white sm:text-5xl">{ui.heading}</h2>
+        <p class="portal-copy mt-4 max-w-3xl text-base leading-8">{ui.copy}</p>
+      </div>
+
+      <div class="portal-blog-hero__stats">
+        <div class="portal-blog-stat">
+          <span class="portal-blog-stat__label">{ui.publications}</span>
+          <strong>{normalizedPosts.length}</strong>
+          <span class="portal-blog-stat__meta">{ui.publicationsMeta}</span>
+        </div>
+        <div class="portal-blog-stat">
+          <span class="portal-blog-stat__label">{ui.featured}</span>
+          <strong>{normalizedPosts.filter((post) => post.isFeatured).length}</strong>
+          <span class="portal-blog-stat__meta">{ui.featuredMeta}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="portal-blog-search mt-8">
+      <label class="portal-blog-search__field">
+        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+        <input
+          id="blog-search"
+          class="portal-input"
+          type="search"
+          placeholder={ui.searchPlaceholder}
+          autocomplete="off"
+        />
+      </label>
+    </div>
+
+    {normalizedPosts.length === 0 ? (
+      <div class="portal-empty-state mt-8 rounded-3xl p-6">
+        {ui.noPosts}
+      </div>
+    ) : (
+      <>
+        {featuredPost && (
+          <article class="portal-blog-featured mt-8" data-blog-card data-search={featuredPost.searchIndex}>
+            <div class="portal-blog-featured__cover">
+              {featuredPost.coverImageUrl ? (
+                <img src={featuredPost.coverImageUrl} alt={featuredPost.title} />
+              ) : (
+                <div class="portal-blog-featured__fallback">
+                  <span class="portal-eyebrow">{ui.featuredArticle}</span>
+                </div>
+              )}
+            </div>
+
+            <div class="portal-blog-featured__body">
+              <div class="portal-blog-featured__meta">
+                <span class="portal-card-badge is-featured">{ui.featuredBadge}</span>
+                <span>{featuredPost.dateLabel}</span>
+                <span class="portal-blog-featured__dot"></span>
+                <span>{featuredPost.authorName}</span>
+              </div>
+
+              <h3>{featuredPost.title}</h3>
+              <p class="portal-copy">{featuredPost.summaryText}</p>
+
+              <div class="portal-blog-tags">
+                {featuredPost.tags.map((tag) => (
+                  <span class="portal-tag">{tag}</span>
+                ))}
+              </div>
+
+              <a
+                href={getPostHref(featuredPost.slug)}
+                class="portal-action-link portal-action-link--solid"
+              >
+                {ui.readArticle}
+              </a>
+            </div>
+          </article>
+        )}
+
+        <div class="portal-blog-results mt-10">
+          <div class="portal-blog-results__toolbar">
+            <h3 class="text-2xl font-semibold text-white">
+              {ui.availableEntries} <span id="blog-visible-count">{normalizedPosts.length}</span>
+            </h3>
+          </div>
+
+          <div id="blog-empty-state" class="portal-empty-state hidden rounded-3xl p-6">
+            {ui.emptyFilter}
+          </div>
+
+          <div class="portal-blog-grid" id="blog-grid">
+            {remainingPosts.map((post) => (
+              <article class="portal-blog-card" data-blog-card data-search={post.searchIndex}>
+                <div class="portal-blog-card__cover">
+                  {post.coverImageUrl ? (
+                    <img src={post.coverImageUrl} alt={post.title} />
+                  ) : (
+                    <div class="portal-blog-card__fallback">
+                      <i class="fa-regular fa-newspaper" aria-hidden="true"></i>
+                    </div>
+                  )}
+                </div>
+
+                <div class="portal-blog-card__body">
+                  <div class="portal-blog-card__meta">
+                    <span>{post.dateLabel}</span>
+                    <span class="portal-blog-card__dot"></span>
+                    <span>{post.authorName}</span>
+                  </div>
+
+                  <h3>{post.title}</h3>
+                  <p class="portal-copy">{post.summaryText}</p>
+
+                  <div class="portal-blog-tags">
+                    {post.tags.map((tag) => (
+                      <span class="portal-tag">{tag}</span>
+                    ))}
+                  </div>
+                </div>
+
+                <div class="portal-blog-card__footer">
+                  <a
+                    href={getPostHref(post.slug)}
+                    class="portal-action-link portal-action-link--solid"
+                  >
+                    {ui.readArticle}
+                  </a>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </>
+    )}
+  </section>
+
+  <p class="mt-8 text-center text-xs font-medium tracking-[0.18em] text-white/45">
+    {ui.footer}
+  </p>
+
+  <style>
+    .portal-blog-hero {
+      display: grid;
+      gap: 1.5rem;
+      align-items: end;
+      grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.8fr);
+    }
+
+    .portal-blog-hero__stats {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .portal-blog-stat {
+      display: grid;
+      gap: 0.35rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 1.6rem;
+      background: rgba(255, 255, 255, 0.04);
+      padding: 1.25rem;
+    }
+
+    .portal-blog-stat__label {
+      font-size: 0.78rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.58);
+    }
+
+    .portal-blog-stat strong {
+      font-size: 2rem;
+      color: #fff;
+    }
+
+    .portal-blog-stat__meta {
+      color: rgba(255, 255, 255, 0.62);
+    }
+
+    .portal-blog-search__field {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      padding: 0.95rem 1rem;
+      border-radius: 1.3rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .portal-blog-search__field i {
+      color: rgba(255, 255, 255, 0.55);
+    }
+
+    .portal-blog-search__field input {
+      width: 100%;
+      background: transparent;
+      border: 0;
+      outline: 0;
+      color: #fff;
+      font: inherit;
+    }
+
+    .portal-blog-search__field input::placeholder {
+      color: rgba(255, 255, 255, 0.45);
+    }
+
+    .portal-blog-featured {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+      gap: 1.2rem;
+      border-radius: 2rem;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.04);
+      overflow: hidden;
+    }
+
+    .portal-blog-featured__cover,
+    .portal-blog-card__cover {
+      position: relative;
+      background: radial-gradient(circle at top left, rgba(239, 124, 14, 0.26), transparent 42%),
+        linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+      min-height: 100%;
+    }
+
+    .portal-blog-featured__cover img,
+    .portal-blog-card__cover img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .portal-blog-featured__fallback,
+    .portal-blog-card__fallback {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      min-height: 240px;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    .portal-blog-card__fallback i {
+      font-size: 2rem;
+      color: #ff8c1a;
+    }
+
+    .portal-blog-featured__body,
+    .portal-blog-card__body {
+      display: grid;
+      gap: 1rem;
+      padding: 1.5rem;
+    }
+
+    .portal-blog-featured__meta,
+    .portal-blog-card__meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.82rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.58);
+    }
+
+    .portal-blog-featured__dot,
+    .portal-blog-card__dot {
+      width: 0.3rem;
+      height: 0.3rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.32);
+    }
+
+    .portal-blog-featured h3,
+    .portal-blog-card h3 {
+      margin: 0;
+      font-size: clamp(1.65rem, 2vw, 2.4rem);
+      line-height: 1.08;
+      color: #fff;
+    }
+
+    .portal-blog-card h3 {
+      font-size: 1.45rem;
+    }
+
+    .portal-blog-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+    }
+
+    .portal-blog-results__toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .portal-blog-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1.2rem;
+    }
+
+    .portal-blog-card {
+      display: grid;
+      grid-template-rows: 220px auto auto;
+      border-radius: 1.7rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      overflow: hidden;
+    }
+
+    .portal-blog-card__footer {
+      padding: 0 1.5rem 1.5rem;
+    }
+
+    .portal-blog-card.is-hidden,
+    .portal-blog-featured.is-hidden {
+      display: none;
+    }
+
+    @media (max-width: 1023px) {
+      .portal-blog-hero,
+      .portal-blog-featured {
+        grid-template-columns: 1fr;
+      }
+
+      .portal-blog-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+
+  <script is:inline>
+    (() => {
+      const searchInput = document.getElementById("blog-search");
+      const cards = Array.from(document.querySelectorAll("[data-blog-card]"));
+      const visibleCount = document.getElementById("blog-visible-count");
+      const emptyState = document.getElementById("blog-empty-state");
+
+      if (!(searchInput instanceof HTMLInputElement) || cards.length === 0 || !visibleCount || !emptyState) {
+        return;
+      }
+
+      const applyFilters = () => {
+        const query = searchInput.value.trim().toLowerCase();
+        let visible = 0;
+
+        cards.forEach((card) => {
+          if (!(card instanceof HTMLElement)) return;
+
+          const searchIndex = card.dataset.search ?? "";
+          const shouldShow = !query || searchIndex.includes(query);
+          card.classList.toggle("is-hidden", !shouldShow);
+
+          if (shouldShow) visible += 1;
+        });
+
+        visibleCount.textContent = String(visible);
+        emptyState.classList.toggle("hidden", visible > 0);
+      };
+
+      searchInput.addEventListener("input", applyFilters);
+    })();
+  </script>
+</PortalLayout>

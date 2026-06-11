@@ -1,0 +1,19 @@
+﻿---
+import { locationItems } from "../data/site";
+---
+
+<section class="location text-white py-12 bg-[#4A6D8A]">
+  <div class="mx-auto w-full max-w-6xl px-6" data-aos="zoom-in">
+    <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      {locationItems.map((item) => (
+        <div class="flex items-center">
+          <div class="p-2"><i class={item.icon + " fa-3x"}></i></div>
+          <div class="ml-2">
+            <h6>{item.title}</h6>
+            <p>{item.text}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

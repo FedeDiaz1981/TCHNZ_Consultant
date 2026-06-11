@@ -1,0 +1,50 @@
+﻿---
+import { footer, socialLinks } from "../data/site";
+---
+
+<section class="footer text-white mb-[1%]">
+  <div class="mx-auto w-full max-w-6xl px-6">
+    <div class="grid gap-10 md:grid-cols-3" data-aos="fade-right">
+      <div class="py-4">
+        <div class="flex items-center">
+          <h4>{footer.title}</h4>
+        </div>
+        <p class="py-3 para-light">{footer.text}</p>
+        <div class="flex">
+          {socialLinks.map((link) => (
+            <div class="mr-3">
+              <a href={link.href} aria-label={link.label}>
+                <i class={link.icon + " fa-2x py-2"}></i>
+              </a>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div class="py-4"></div>
+
+      <div class="py-4">
+        <div>
+          <h4 class="py-2">Quick Links</h4>
+          {footer.quickLinks.map((link) => (
+            <div class="flex items-center py-2">
+              <i class="fas fa-caret-right"></i>
+              <a href={link.href}><p class="ml-3">{link.label}</p></a>
+            </div>
+          ))}
+        </div>
+
+        <div class="pt-6">
+          <div class="flex items-center">
+            <h4>Certificados</h4>
+          </div>
+          {footer.certificates.map((cert) => (
+            <div class="flex items-center">
+              <p><img src={cert.src} width={cert.width} alt={cert.alt} /></p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,68 @@
+﻿---
+import { contact } from "../data/site";
+---
+
+<section class="contact flex items-center py-12" id="contact">
+  <div class="mx-auto w-full max-w-6xl px-6 py-12 text-white">
+    <div class="grid gap-10 lg:grid-cols-2">
+      <div class="flex justify-center lg:justify-end" data-aos="fade-right">
+        <div class="w-full lg:w-[90%]">
+          <div class="text-center lg:text-left py-4">
+            <p>{contact.label}</p>
+            <h2 class="py-2">{contact.title}</h2>
+            <p class="para-light"></p>
+          </div>
+          <form action={contact.form.action} method="POST">
+            <div class="grid gap-4 md:grid-cols-2">
+              <div class="form-group py-2">
+                <input
+                  type="text"
+                  id="name"
+                  name={contact.form.fields.name.label}
+                  class="form-control-input"
+                  placeholder={contact.form.fields.name.placeholder}
+                />
+              </div>
+              <div class="form-group py-2">
+                <input
+                  type="tel"
+                  id="phone"
+                  name={contact.form.fields.phone.label}
+                  class="form-control-input"
+                  placeholder={contact.form.fields.phone.placeholder}
+                />
+              </div>
+            </div>
+            <div class="form-group py-1">
+              <input
+                type="email"
+                id="mail"
+                name={contact.form.fields.mail.label}
+                class="form-control-input"
+                placeholder={contact.form.fields.mail.placeholder}
+              />
+            </div>
+            <div class="form-group py-2">
+              <textarea
+                id="message"
+                name={contact.form.fields.message.label}
+                class="form-control-textarea"
+                rows="6"
+                placeholder={contact.form.fields.message.placeholder}
+              ></textarea>
+            </div>
+            <div class="py-2 hidden">
+              <div class="g-recaptcha" data-sitekey={contact.recaptchaKey}></div>
+            </div>
+            <div class="py-2">
+              <button type="submit" class="btn">Enviar</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <div class="flex items-center" data-aos="fade-down">
+        <img class="hidden w-full lg:block" src={contact.image} alt={contact.imageAlt} />
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,2232 @@
+﻿---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import {
+  getAdminBlogPosts,
+  getAdminDistributionContacts,
+  getAdminDistributionLists
+} from "../../lib/portal/admin";
+import { getAdminFlash } from "../../lib/portal/admin-flash";
+import { getModuleContentSection, getPortalModuleConfig } from "../../lib/portal/modules";
+
+const user = Astro.locals.user;
+const supabase = Astro.locals.supabase;
+const portalModule = Astro.locals.portalModule;
+const moduleConfig = getPortalModuleConfig(portalModule);
+const contentSection = getModuleContentSection(portalModule);
+
+if (!user || !supabase) {
+  return Astro.redirect("/consultant/login");
+}
+
+if (!contentSection) {
+  return Astro.redirect("/consultant/admin");
+}
+
+const flash = getAdminFlash(Astro.url);
+const [posts, distributionContacts, distributionLists] = await Promise.all([
+  getAdminBlogPosts(supabase, portalModule, contentSection),
+  getAdminDistributionContacts(supabase, portalModule),
+  getAdminDistributionLists(supabase, portalModule)
+]);
+const sectionLabel = contentSection === "training" ? "Training" : "Blog";
+
+const statusLabels = {
+  draft: "Borrador",
+  published: "Publicado"
+} as const;
+
+const rows = posts.map((post) => ({
+  ...post,
+  dialogId: getDialogId(post.id),
+  searchIndex: `${post.title} ${post.slug} ${post.authorName} ${post.summary ?? ""} ${post.tags.join(" ")} ${statusLabels[post.status]}`
+    .toLowerCase()
+    .trim()
+}));
+
+function getDialogId(postId: string) {
+  return `blog-post-dialog-${postId}`;
+}
+
+function formatDateTimeLabel(value: string | null) {
+  if (!value) return "Sin publicar";
+
+  return new Intl.DateTimeFormat("es-AR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(value));
+}
+
+function formatDateTimeInput(value: string | null) {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const offset = date.getTimezoneOffset();
+  const localDate = new Date(date.getTime() - offset * 60_000);
+  return localDate.toISOString().slice(0, 16);
+}
+---
+
+<AdminLayout
+  title={`${sectionLabel} | Administracion portal`}
+  description={`Gestion administrativa de ${sectionLabel.toLowerCase()} para ${moduleConfig.name.es}`}
+  userEmail={user.email ?? ""}
+  activePath="/admin/blog"
+  portalModule={portalModule}
+>
+  <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+    {flash && (
+      <div
+        class:list={[
+          "mb-6 rounded-3xl border px-4 py-3.5 text-sm sm:px-5 sm:py-4",
+          flash.tone === "error"
+            ? "border-red-400/30 bg-red-500/10 text-red-50"
+            : "border-emerald-400/30 bg-emerald-500/10 text-emerald-50"
+        ]}
+      >
+        {flash.message}
+      </div>
+    )}
+
+    <section class="space-y-6">
+      <div class="portal-panel rounded-[30px] p-5 sm:p-6">
+        <div class="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div class="max-w-3xl">
+            <p class="portal-eyebrow text-[11px]">Contenido editorial</p>
+            <h2 class="mt-2 text-2xl font-semibold text-white sm:text-3xl">{sectionLabel} del portal</h2>
+            <p class="portal-copy mt-2 hidden text-sm leading-6 sm:block">
+              {contentSection === "training"
+                ? "Crea materiales, publica contenidos y mantene una biblioteca de training para la comunidad del modulo."
+                : "Crea borradores, publica novedades y mantene una biblioteca de contenido para la comunidad privada del portal."}
+            </p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="self-start rounded-full border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-white/70 sm:self-auto">
+              {posts.length} {contentSection === "training" ? "contenidos" : "articulos"}
+            </span>
+            <button
+              type="button"
+              class="portal-action-link portal-action-link--solid w-full justify-center sm:w-auto"
+              data-open-dialog="create-blog-post-dialog"
+            >
+              {contentSection === "training" ? "Nuevo contenido" : "Nueva publicacion"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="portal-panel rounded-[30px] p-0">
+        <div class="px-4 pt-4 sm:px-6 sm:pt-5">
+          <div class="admin-blog-toolbar">
+            <label class="admin-blog-search">
+              <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+              <input
+                type="search"
+                placeholder="Buscar por titulo, autor, tag o estado"
+                data-blog-search
+              />
+            </label>
+
+            <p class="portal-copy hidden text-xs sm:block sm:text-sm">
+              Click en una fila para editar y publicar el articulo.
+            </p>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <div class="px-4 pb-4 lg:min-w-[1080px] sm:px-6 sm:pb-5">
+            <div class="admin-blog-head">
+              <span>Articulo</span>
+              <span>Estado</span>
+              <span>Publicacion</span>
+              <span>Tags</span>
+              <span>Destacado</span>
+              <span class="text-right">Accion</span>
+            </div>
+
+            <div class="mt-3 space-y-3">
+              {rows.map((post) => (
+                  <>
+                    <button
+                      type="button"
+                      class="admin-blog-row"
+                      data-open-dialog={post.dialogId}
+                      data-blog-row
+                      data-blog-search-value={post.searchIndex}
+                      aria-label={`Abrir detalle de ${post.title}`}
+                    >
+                      <span class="admin-blog-row__identity">
+                        <span class="admin-blog-icon">
+                          <i class="fa-regular fa-newspaper" aria-hidden="true"></i>
+                        </span>
+                        <span class="min-w-0 text-left">
+                          <strong class="block truncate text-sm text-white">{post.title}</strong>
+                          <span class="portal-copy block truncate text-xs">{post.slug}</span>
+                          <span class="portal-copy block truncate text-xs">{post.authorName}</span>
+                        </span>
+                      </span>
+
+                      <span class={`admin-blog-pill is-${post.status}`}>{statusLabels[post.status]}</span>
+                      <span class="admin-blog-row__date">{formatDateTimeLabel(post.publishedAt)}</span>
+                      <span class="admin-blog-row__tags">{post.tags.length > 0 ? post.tags.join(", ") : "Sin tags"}</span>
+                      <span class="admin-blog-row__featured">{post.isFeatured ? "Si" : "No"}</span>
+                      <span class="admin-blog-row__action text-right text-xs font-semibold uppercase tracking-[0.18em] text-[#ff8c1a]">
+                        Abrir
+                      </span>
+                    </button>
+
+                    <dialog id={post.dialogId} data-admin-dialog class="admin-blog-dialog">
+                      <div class="admin-blog-dialog__panel portal-panel rounded-[32px] p-0">
+                        <div class="admin-blog-dialog__header flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4 sm:px-6">
+                          <div>
+                            <p class="portal-eyebrow text-[11px]">Detalle de articulo</p>
+                            <h3 class="mt-2 text-xl font-semibold text-white sm:text-2xl">{post.title}</h3>
+                            <p class="portal-copy mt-1 text-sm">/{post.slug}</p>
+                          </div>
+
+                          <button
+                            type="button"
+                            class="rounded-full border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/70 transition hover:border-white/20 hover:text-white"
+                            data-close-dialog
+                          >
+                            Cerrar
+                          </button>
+                        </div>
+
+                        <form action="/consultant/api/admin/manage" method="POST" enctype="multipart/form-data" class="flex max-h-[82vh] flex-col">
+                          <input type="hidden" name="action" value="update-blog-post" />
+                          <input type="hidden" name="redirect_to" value="/admin/blog" />
+                          <input type="hidden" name="blog_post_id" value={post.id} />
+                          <input type="hidden" name="current_published_at" value={post.publishedAt ?? ""} />
+                          <input type="hidden" name="current_cover_image_url" value={post.coverImageUrl ?? ""} />
+
+                          <div class="admin-blog-dialog__body overflow-y-auto px-5 py-5 sm:px-6">
+                            <div class="grid gap-5 xl:grid-cols-[270px_minmax(0,1fr)]">
+                              <aside class="space-y-4">
+                                <div class="rounded-[28px] border border-white/10 bg-black/20 p-4">
+                                  <p class="portal-copy text-xs uppercase tracking-[0.14em]">Resumen</p>
+                                  <div class="mt-4 space-y-3">
+                                    <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
+                                      <p class="portal-copy text-[11px] uppercase tracking-[0.14em]">Estado</p>
+                                      <strong class="mt-2 block text-base text-white">{statusLabels[post.status]}</strong>
+                                    </div>
+                                    <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
+                                      <p class="portal-copy text-[11px] uppercase tracking-[0.14em]">Publicacion</p>
+                                      <strong class="mt-2 block text-base text-white">{formatDateTimeLabel(post.publishedAt)}</strong>
+                                    </div>
+                                    <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
+                                      <p class="portal-copy text-[11px] uppercase tracking-[0.14em]">Tags</p>
+                                      <strong class="mt-2 block text-base text-white">{post.tags.length}</strong>
+                                    </div>
+                                  </div>
+                                </div>
+                              </aside>
+
+                              <div class="space-y-5">
+                                <div class="rounded-[28px] border border-white/10 bg-black/20 p-4 sm:p-5">
+                                  <div>
+                                    <p class="portal-copy text-xs uppercase tracking-[0.14em]">Datos base</p>
+                                    <p class="portal-copy mt-1 text-sm">Identidad editorial y elementos de portada.</p>
+                                  </div>
+
+                                  <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                                    <label class="block">
+                                      <span class="mb-2 block text-sm font-medium text-white/80">Titulo</span>
+                                      <input class="portal-input w-full rounded-2xl px-4 py-3" type="text" name="title" value={post.title} required />
+                                    </label>
+                                    <label class="block">
+                                      <span class="mb-2 block text-sm font-medium text-white/80">Slug</span>
+                                      <input class="portal-input w-full rounded-2xl px-4 py-3" type="text" name="slug" value={post.slug} required />
+                                    </label>
+                                  </div>
+
+                                  <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                                    <label class="block">
+                                      <span class="mb-2 block text-sm font-medium text-white/80">Autor</span>
+                                      <input class="portal-input w-full rounded-2xl px-4 py-3" type="text" name="author_name" value={post.authorName} />
+                                    </label>
+                                    <label class="block">
+                                      <span class="mb-2 block text-sm font-medium text-white/80">Imagen de portada</span>
+                                      {post.coverImageUrl && (
+                                        <img
+                                          src={post.coverImageUrl}
+                                          alt={`Portada de ${post.title}`}
+                                          class="mb-3 h-24 w-full rounded-2xl border border-white/10 object-cover"
+                                        />
+                                      )}
+                                      <input
+                                        class="portal-input w-full rounded-2xl px-4 py-3"
+                                        type="file"
+                                        name="cover_image_file"
+                                        accept="image/png,image/jpeg,image/webp,image/gif"
+                                      />
+                                      <p class="portal-copy mt-2 text-xs">
+                                        Si no subes una nueva, se conserva la portada actual.
+                                      </p>
+                                    </label>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div class="space-y-5 xl:col-span-2">
+                                <div class="rounded-[28px] border border-white/10 bg-black/20 p-4 sm:p-5">
+                                  <label class="block">
+                                    <span class="mb-2 block text-sm font-medium text-white/80">Resumen</span>
+                                    <textarea class="portal-input min-h-24 w-full rounded-2xl px-4 py-3" name="summary">{post.summary ?? ""}</textarea>
+                                  </label>
+
+                                  <div class="mt-4 block">
+                                    <span class="mb-2 block text-sm font-medium text-white/80">Contenido</span>
+                                    <div class="admin-editor-shell">
+                                      <div class="admin-editor-toolbar">
+                                        <select data-editor-select="content-type" class="admin-editor-select">
+                                          <option value="text">Bloque texto</option>
+                                          <option value="image">Bloque imagen</option>
+                                          <option value="link">Bloque link</option>
+                                        </select>
+                                        <button type="button" data-editor-action="draw-area">Definir area</button>
+                                        <select data-editor-select="font-size" class="admin-editor-select">
+                                          <option value="14">14px</option>
+                                          <option value="16" selected>16px</option>
+                                          <option value="18">18px</option>
+                                          <option value="20">20px</option>
+                                          <option value="22">22px</option>
+                                          <option value="24">24px</option>
+                                          <option value="28">28px</option>
+                                          <option value="32">32px</option>
+                                          <option value="36">36px</option>
+                                        </select>
+                                        <select data-editor-select="font-family" class="admin-editor-select">
+                                          <option value="inherit" selected>Inter / Default</option>
+                                          <option value="Inter, sans-serif">Inter</option>
+                                          <option value="Arial, sans-serif">Arial</option>
+                                          <option value="'Georgia', serif">Georgia</option>
+                                          <option value="'Times New Roman', serif">Times</option>
+                                          <option value="'Verdana', sans-serif">Verdana</option>
+                                          <option value="'Courier New', monospace">Monospace</option>
+                                        </select>
+                                        <button type="button" data-editor-command="bold">Negrita</button>
+                                        <button type="button" data-editor-command="italic">Cursiva</button>
+                                        <button type="button" data-editor-command="underline">Subrayado</button>
+                                        <button type="button" data-editor-command="insertUnorderedList">Lista</button>
+                                        <button type="button" data-editor-command="justifyLeft">Izq</button>
+                                        <button type="button" data-editor-command="justifyCenter">Centro</button>
+                                        <button type="button" data-editor-command="justifyRight">Der</button>
+                                      </div>
+                                      <div class="admin-editor-surface" data-rich-editor contenteditable="true" set:html={post.content}></div>
+                                      <textarea class="portal-input min-h-72 w-full rounded-2xl px-4 py-3 hidden" name="content" required data-rich-output>{post.content}</textarea>
+                                      <p class="portal-copy mt-2 text-xs">
+                                        Puedes pegar imagen directo (Ctrl+V). Se sube automaticamente.
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div class="rounded-[28px] border border-white/10 bg-black/20 p-4 sm:p-5">
+                                  <div class="grid gap-4 lg:grid-cols-3">
+                                    <label class="block">
+                                      <span class="mb-2 block text-sm font-medium text-white/80">Tags</span>
+                                      <input class="portal-input w-full rounded-2xl px-4 py-3" type="text" name="tags" value={post.tags.join(", ")} />
+                                    </label>
+                                    <label class="block">
+                                      <span class="mb-2 block text-sm font-medium text-white/80">Estado</span>
+                                      <select class="portal-input w-full rounded-2xl px-4 py-3" name="status">
+                                        <option value="draft" selected={post.status === "draft"}>Borrador</option>
+                                        <option value="published" selected={post.status === "published"}>Publicado</option>
+                                      </select>
+                                    </label>
+                                    <label class="block">
+                                      <span class="mb-2 block text-sm font-medium text-white/80">Fecha de publicacion</span>
+                                      <input class="portal-input w-full rounded-2xl px-4 py-3" type="datetime-local" name="published_at" value={formatDateTimeInput(post.publishedAt)} />
+                                    </label>
+                                  </div>
+
+                                  <label class="mt-4 block">
+                                    <span class="mb-2 block text-sm font-medium text-white/80">Links de referencia</span>
+                                    <textarea class="portal-input min-h-24 w-full rounded-2xl px-4 py-3" name="reference_links" placeholder="Un link por linea">{post.referenceLinks.join("\n")}</textarea>
+                                  </label>
+
+                                  <label class="mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80">
+                                    <input type="hidden" name="is_featured" value="false" />
+                                    <input type="checkbox" name="is_featured" value="true" checked={post.isFeatured} class="h-4 w-4" />
+                                    Articulo destacado
+                                  </label>
+
+                                  <div class="mt-4 rounded-[24px] border border-white/10 bg-white/5 p-4">
+                                    <label class="block">
+                                      <span class="mb-2 block text-sm font-medium text-white/80">Distribucion por email</span>
+                                      <input type="hidden" name="distribution_email_enabled" value="false" />
+                                      <label class="flex items-center gap-3 text-sm text-white/80">
+                                        <input
+                                          type="checkbox"
+                                          name="distribution_email_enabled"
+                                          value="true"
+                                          checked={post.distributionEmailEnabled}
+                                          class="h-4 w-4"
+                                        />
+                                        Enviar este articulo por email a la lista de distribucion al guardar
+                                      </label>
+                                    </label>
+
+                                    <label class="mt-4 block">
+                                      <span class="mb-2 block text-sm font-medium text-white/80">Correos libres</span>
+                                      <textarea
+                                        class="portal-input min-h-24 w-full rounded-2xl px-4 py-3"
+                                        name="distribution_emails"
+                                        placeholder="articulo1@empresa.com, articulo2@empresa.com"
+                                      >{post.distributionEmails.join("\n")}</textarea>
+                                      <p class="portal-copy mt-2 text-xs">
+                                        Un email por linea o separado por comas.
+                                      </p>
+                                    </label>
+
+                                    <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                                      <label class="block">
+                                        <span class="mb-2 block text-sm font-medium text-white/80">Correos cargados</span>
+                                        <select
+                                          class="portal-input min-h-44 w-full rounded-2xl px-4 py-3"
+                                          name="distribution_contact_ids"
+                                          multiple
+                                        >
+                                          {distributionContacts.map((contact) => (
+                                            <option value={contact.id} selected={post.distributionContactIds.includes(contact.id)}>
+                                              {contact.email}
+                                              {contact.displayName ? ` · ${contact.displayName}` : ""}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        <p class="portal-copy mt-2 text-xs">Mantene Ctrl/Cmd para elegir varios correos.</p>
+                                      </label>
+
+                                      <label class="block">
+                                        <span class="mb-2 block text-sm font-medium text-white/80">Listas de difusión</span>
+                                        <select
+                                          class="portal-input min-h-44 w-full rounded-2xl px-4 py-3"
+                                          name="distribution_list_ids"
+                                          multiple
+                                        >
+                                          {distributionLists.map((list) => (
+                                            <option value={list.id} selected={post.distributionListIds.includes(list.id)}>
+                                              {list.name} · {list.memberCount} correos
+                                            </option>
+                                          ))}
+                                        </select>
+                                        <p class="portal-copy mt-2 text-xs">Mantene Ctrl/Cmd para elegir varias listas.</p>
+                                      </label>
+                                    </div>
+                                  </div>
+
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="admin-blog-dialog__footer flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-5 py-4 sm:px-6">
+                            <button
+                              type="submit"
+                              name="intent"
+                              value="delete-blog-post"
+                              class="portal-action-link border-red-400/25 bg-red-500/10 text-red-50 hover:border-red-300/30 hover:bg-red-500/15"
+                              data-confirm-submit="Vas a quitar este articulo del blog visible. Esta accion no se puede deshacer. Â¿Deseas continuar?"
+                            >
+                              Eliminar articulo
+                            </button>
+
+                            <div class="flex flex-wrap items-center justify-end gap-3">
+                              <button type="button" class="portal-action-link" data-close-dialog>
+                                Cancelar
+                              </button>
+                              <button type="submit" class="portal-action-link portal-action-link--solid">
+                                Guardar cambios
+                              </button>
+                            </div>
+                          </div>
+                        </form>
+                      </div>
+                    </dialog>
+                  </>
+              ))}
+            </div>
+
+            <div class="portal-empty-state mt-4 hidden rounded-[24px] px-4 py-5 text-sm" data-blog-empty>
+              No encontramos articulos con ese criterio de busqueda.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <dialog id="create-blog-post-dialog" data-admin-dialog class="admin-blog-dialog admin-blog-dialog--compact">
+    <div class="admin-blog-dialog__panel portal-panel rounded-[32px] p-0">
+      <div class="admin-blog-dialog__header flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4 sm:px-6">
+        <div>
+          <p class="portal-eyebrow text-[11px]">Nueva publicacion</p>
+          <h3 class="mt-2 text-2xl font-semibold text-white">Articulo de blog</h3>
+          <p class="portal-copy mt-1 text-sm">Crea un borrador o publicalo directamente para el portal.</p>
+        </div>
+
+        <button
+          type="button"
+          class="rounded-full border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/70 transition hover:border-white/20 hover:text-white"
+          data-close-dialog
+        >
+          Cerrar
+        </button>
+      </div>
+
+      <form action="/consultant/api/admin/manage" method="POST" enctype="multipart/form-data" class="flex max-h-[82vh] flex-col">
+        <input type="hidden" name="action" value="create-blog-post" />
+        <input type="hidden" name="redirect_to" value="/admin/blog" />
+
+        <div class="admin-blog-dialog__body overflow-y-auto px-5 py-5 sm:px-6">
+          <div class="space-y-4 rounded-[28px] border border-white/10 bg-black/20 p-4 sm:p-5">
+            <div class="grid gap-4 lg:grid-cols-2">
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-white/80">Titulo</span>
+                <input class="portal-input w-full rounded-2xl px-4 py-3" type="text" name="title" required />
+              </label>
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-white/80">Slug</span>
+                <input class="portal-input w-full rounded-2xl px-4 py-3" type="text" name="slug" required />
+              </label>
+            </div>
+
+            <div class="grid gap-4 lg:grid-cols-2">
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-white/80">Autor</span>
+                <input class="portal-input w-full rounded-2xl px-4 py-3" type="text" name="author_name" value="Equipo Technized" />
+              </label>
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-white/80">Imagen de portada</span>
+                <input
+                  class="portal-input w-full rounded-2xl px-4 py-3"
+                  type="file"
+                  name="cover_image_file"
+                  accept="image/png,image/jpeg,image/webp,image/gif"
+                />
+              </label>
+            </div>
+
+            <label class="block">
+              <span class="mb-2 block text-sm font-medium text-white/80">Resumen</span>
+              <textarea class="portal-input min-h-24 w-full rounded-2xl px-4 py-3" name="summary"></textarea>
+            </label>
+
+            <div class="block">
+              <span class="mb-2 block text-sm font-medium text-white/80">Contenido</span>
+              <div class="admin-editor-shell">
+                <div class="admin-editor-toolbar">
+                  <select data-editor-select="content-type" class="admin-editor-select">
+                    <option value="text">Bloque texto</option>
+                    <option value="image">Bloque imagen</option>
+                    <option value="link">Bloque link</option>
+                  </select>
+                  <button type="button" data-editor-action="draw-area">Definir area</button>
+                  <select data-editor-select="font-size" class="admin-editor-select">
+                                          <option value="14">14px</option>
+                                          <option value="16" selected>16px</option>
+                                          <option value="18">18px</option>
+                                          <option value="20">20px</option>
+                                          <option value="22">22px</option>
+                                          <option value="24">24px</option>
+                                          <option value="28">28px</option>
+                                          <option value="32">32px</option>
+                                          <option value="36">36px</option>
+                                        </select>
+                                        <select data-editor-select="font-family" class="admin-editor-select">
+                                          <option value="inherit" selected>Inter / Default</option>
+                                          <option value="Inter, sans-serif">Inter</option>
+                                          <option value="Arial, sans-serif">Arial</option>
+                                          <option value="'Georgia', serif">Georgia</option>
+                                          <option value="'Times New Roman', serif">Times</option>
+                                          <option value="'Verdana', sans-serif">Verdana</option>
+                                          <option value="'Courier New', monospace">Monospace</option>
+                                        </select>
+                                        <button type="button" data-editor-command="bold">Negrita</button>
+                                        <button type="button" data-editor-command="italic">Cursiva</button>
+                                        <button type="button" data-editor-command="underline">Subrayado</button>
+                                        <button type="button" data-editor-command="insertUnorderedList">Lista</button>
+                                        <button type="button" data-editor-command="justifyLeft">Izq</button>
+                                        <button type="button" data-editor-command="justifyCenter">Centro</button>
+                                        <button type="button" data-editor-command="justifyRight">Der</button>
+                                      </div>
+                <div class="admin-editor-surface" data-rich-editor contenteditable="true"></div>
+                <textarea class="portal-input min-h-72 w-full rounded-2xl px-4 py-3 hidden" name="content" required data-rich-output></textarea>
+                <p class="portal-copy mt-2 text-xs">
+                  Puedes pegar imagen directo (Ctrl+V). Se sube automaticamente.
+                </p>
+              </div>
+            </div>
+
+            <div class="grid gap-4 lg:grid-cols-3">
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-white/80">Tags</span>
+                <input class="portal-input w-full rounded-2xl px-4 py-3" type="text" name="tags" placeholder="Tecnologia, Automatizacion" />
+              </label>
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-white/80">Estado</span>
+                <select class="portal-input w-full rounded-2xl px-4 py-3" name="status">
+                  <option value="draft">Borrador</option>
+                  <option value="published">Publicado</option>
+                </select>
+              </label>
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-white/80">Fecha de publicacion</span>
+              <input class="portal-input w-full rounded-2xl px-4 py-3" type="datetime-local" name="published_at" />
+            </label>
+          </div>
+
+          <label class="block">
+            <span class="mb-2 block text-sm font-medium text-white/80">Links de referencia</span>
+            <textarea class="portal-input min-h-24 w-full rounded-2xl px-4 py-3" name="reference_links" placeholder="Un link por linea"></textarea>
+          </label>
+
+          <label class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80">
+            <input type="hidden" name="is_featured" value="false" />
+            <input type="checkbox" name="is_featured" value="true" class="h-4 w-4" />
+            Articulo destacado
+          </label>
+
+          <div class="rounded-[28px] border border-white/10 bg-white/5 p-4">
+            <label class="block">
+              <span class="mb-2 block text-sm font-medium text-white/80">Distribucion por email</span>
+              <input type="hidden" name="distribution_email_enabled" value="false" />
+              <label class="flex items-center gap-3 text-sm text-white/80">
+                <input
+                  type="checkbox"
+                  name="distribution_email_enabled"
+                  value="true"
+                  class="h-4 w-4"
+                />
+                Enviar este articulo por email a la lista de distribucion al guardar
+              </label>
+            </label>
+
+            <label class="mt-4 block">
+              <span class="mb-2 block text-sm font-medium text-white/80">Correos libres</span>
+              <textarea
+                class="portal-input min-h-24 w-full rounded-2xl px-4 py-3"
+                name="distribution_emails"
+                placeholder="articulo1@empresa.com, articulo2@empresa.com"
+              ></textarea>
+              <p class="portal-copy mt-2 text-xs">
+                Un email por linea o separado por comas.
+              </p>
+            </label>
+
+            <div class="mt-4 grid gap-4 lg:grid-cols-2">
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-white/80">Correos cargados</span>
+                <select
+                  class="portal-input min-h-44 w-full rounded-2xl px-4 py-3"
+                  name="distribution_contact_ids"
+                  multiple
+                >
+                  {distributionContacts.map((contact) => (
+                    <option value={contact.id}>
+                      {contact.email}
+                      {contact.displayName ? ` · ${contact.displayName}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <p class="portal-copy mt-2 text-xs">Mantene Ctrl/Cmd para elegir varios correos.</p>
+              </label>
+
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-white/80">Listas de difusión</span>
+                <select
+                  class="portal-input min-h-44 w-full rounded-2xl px-4 py-3"
+                  name="distribution_list_ids"
+                  multiple
+                >
+                  {distributionLists.map((list) => (
+                    <option value={list.id}>
+                      {list.name} · {list.memberCount} correos
+                    </option>
+                  ))}
+                </select>
+                <p class="portal-copy mt-2 text-xs">Mantene Ctrl/Cmd para elegir varias listas.</p>
+              </label>
+            </div>
+          </div>
+          </div>
+        </div>
+
+        <div class="admin-blog-dialog__footer flex flex-wrap items-center justify-end gap-3 border-t border-white/10 px-5 py-4 sm:px-6">
+          <button type="button" class="portal-action-link" data-reset-form>
+            Limpiar formulario
+          </button>
+          <button type="button" class="portal-action-link" data-close-dialog>
+            Cancelar
+          </button>
+          <button type="submit" class="portal-action-link portal-action-link--solid">
+            Guardar articulo
+          </button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+</AdminLayout>
+
+<style>
+  .admin-blog-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .admin-blog-search {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: min(100%, 460px);
+    padding: 0.9rem 1rem;
+    border-radius: 1.1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .admin-blog-search i {
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .admin-blog-search input {
+    width: 100%;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #fff;
+    font: inherit;
+  }
+
+  .admin-blog-search input::placeholder {
+    color: rgba(255, 255, 255, 0.42);
+  }
+
+  .admin-blog-head,
+  .admin-blog-row {
+    display: grid;
+    grid-template-columns: minmax(320px, 2fr) minmax(120px, 0.75fr) minmax(150px, 1fr) minmax(180px, 1.2fr) minmax(90px, 0.6fr) minmax(80px, 0.45fr);
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .admin-blog-head {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 0 1rem 0.9rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .admin-blog-row {
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 1.35rem;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 0.95rem 1rem;
+    text-align: left;
+    transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+  }
+
+  .admin-blog-row:hover {
+    border-color: rgba(239, 124, 14, 0.36);
+    background: rgba(255, 255, 255, 0.06);
+    transform: translateY(-1px);
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.18);
+  }
+
+  .admin-blog-row:focus-visible {
+    outline: 2px solid rgba(255, 140, 26, 0.7);
+    outline-offset: 3px;
+  }
+
+  .admin-blog-row__identity {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.8rem;
+  }
+
+  .admin-blog-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+  }
+
+  .admin-blog-row__date,
+  .admin-blog-row__tags,
+  .admin-blog-row__featured {
+    color: #fff;
+    font-size: 0.92rem;
+  }
+
+  .admin-blog-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    min-width: 100px;
+    padding: 0.42rem 0.8rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .admin-blog-pill.is-draft {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.82);
+  }
+
+  .admin-blog-pill.is-published {
+    background: rgba(16, 185, 129, 0.16);
+    color: #d1fae5;
+    border-color: rgba(52, 211, 153, 0.32);
+  }
+
+  .admin-blog-dialog {
+    width: min(1120px, calc(100vw - 2rem));
+    max-width: 1120px;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    color: inherit;
+  }
+
+  .admin-blog-dialog--compact {
+    width: min(960px, calc(100vw - 2rem));
+    max-width: 960px;
+  }
+
+  .admin-blog-dialog::backdrop {
+    background: rgba(8, 6, 14, 0.82);
+    backdrop-filter: blur(10px);
+  }
+
+  .admin-blog-dialog__panel {
+    overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.38);
+  }
+
+  .admin-blog-dialog__header,
+  .admin-blog-dialog__footer {
+    background: rgba(13, 10, 20, 0.92);
+    backdrop-filter: blur(18px);
+  }
+
+  .admin-blog-dialog__footer {
+    position: sticky;
+    bottom: 0;
+  }
+
+  .admin-editor-shell {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1rem;
+    padding: 0.75rem;
+    background: rgba(9, 6, 16, 0.7);
+  }
+
+  .admin-editor-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    margin-bottom: 0.7rem;
+  }
+
+  .admin-editor-toolbar button {
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.9);
+    border-radius: 0.7rem;
+    padding: 0.35rem 0.55rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+  .admin-editor-toolbar button.is-active {
+    border-color: rgba(255, 140, 26, 0.65);
+    background: rgba(255, 140, 26, 0.2);
+    color: #fff;
+    box-shadow: 0 0 12px rgba(255, 140, 26, 0.35);
+  }
+
+  .admin-editor-select {
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.9);
+    border-radius: 0.7rem;
+    padding: 0.35rem 0.55rem;
+    font-size: 0.75rem;
+    color-scheme: dark;
+  }
+
+  .admin-editor-select option {
+    background: #18131f;
+    color: rgba(255, 255, 255, 0.92);
+  }
+
+  .admin-editor-toolbar button:focus,
+  .admin-editor-select:focus {
+    outline: 1px solid rgba(255, 140, 26, 0.7);
+    outline-offset: 1px;
+  }
+
+  .admin-editor-surface {
+    min-height: 18rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.9rem;
+    padding: 0.85rem;
+    color: #fff;
+    line-height: 1.6;
+    background: rgba(0, 0, 0, 0.22);
+    overflow: auto;
+    position: relative;
+    resize: vertical;
+    max-height: none;
+  }
+
+  .admin-editor-surface.is-draw-mode {
+    cursor: crosshair;
+  }
+
+  :global(.admin-editor-draw-ghost) {
+    position: absolute;
+    border: 2px solid rgba(255, 214, 102, 0.98);
+    background: rgba(255, 214, 102, 0.22);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.24),
+      0 0 0 1px rgba(255, 170, 84, 0.55),
+      0 0 20px rgba(255, 184, 51, 0.35);
+    pointer-events: none;
+    z-index: 6;
+  }
+
+  :global(.editor-layout-block) {
+    position: absolute;
+    border: 2px solid transparent;
+    border-radius: 0.75rem;
+    background: transparent;
+    box-shadow: none;
+    padding: 0.55rem;
+    min-width: 90px;
+    min-height: 48px;
+    z-index: 5;
+    cursor: move;
+  }
+
+  :global(.editor-layout-block.is-selected) {
+    border-color: rgba(255, 224, 122, 1);
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.26),
+      0 0 0 2px rgba(255, 184, 51, 0.45),
+      0 0 18px rgba(255, 170, 84, 0.62);
+  }
+
+  :global(.editor-layout-block__text) {
+    min-height: 100%;
+    outline: none;
+    color: #fff;
+    cursor: text;
+  }
+
+  :global(.editor-layout-block__resize) {
+    position: absolute;
+    right: -6px;
+    bottom: -6px;
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 170, 84, 0.95);
+    background: #1d1328;
+    cursor: nwse-resize;
+  }
+
+  .admin-editor-surface img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.5rem;
+    display: block;
+    margin: 0.7rem 0;
+  }
+
+  .admin-editor-surface .editor-image {
+    display: block;
+    width: fit-content;
+    max-width: 100%;
+    margin: 0.9rem auto;
+    clear: both;
+  }
+
+  .admin-editor-surface .editor-image img {
+    margin: 0;
+    cursor: pointer;
+    transition: box-shadow 140ms ease, outline-color 140ms ease, filter 140ms ease;
+  }
+
+  .admin-editor-surface .editor-image.is-left {
+    float: left;
+    margin: 0.8rem 1rem 0.8rem 0;
+    clear: none;
+  }
+
+  .admin-editor-surface .editor-image.is-right {
+    float: right;
+    margin: 0.8rem 0 0.8rem 1rem;
+    clear: none;
+  }
+
+  .admin-editor-surface .editor-image.is-center {
+    float: none;
+    margin: 0.9rem auto;
+    clear: both;
+  }
+
+  .admin-editor-surface .editor-image.is-free {
+    float: none;
+    clear: both;
+    margin-top: 0.9rem;
+    margin-bottom: 0.9rem;
+    margin-right: 0;
+  }
+
+
+  .admin-editor-surface img.is-selected {
+    outline: 2px solid rgba(255, 170, 84, 0.95);
+    outline-offset: 2px;
+    box-shadow:
+      0 0 0 9999px rgba(0, 0, 0, 0.14),
+      0 0 0 2px rgba(255, 140, 26, 0.25),
+      0 0 16px rgba(255, 140, 26, 0.65),
+      0 0 28px rgba(255, 140, 26, 0.4);
+    filter: saturate(1.06);
+    cursor: pointer;
+  }
+
+  .admin-editor-surface img.is-dragging {
+    opacity: 0.6;
+    cursor: grabbing;
+  }
+
+  .admin-editor-image-floating {
+    position: absolute;
+    z-index: 8;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 0.8rem;
+    background: rgba(12, 10, 20, 0.94);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+  }
+
+  .admin-editor-image-floating.hidden {
+    display: none;
+  }
+
+  .admin-editor-image-floating button {
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.92);
+    border-radius: 0.6rem;
+    padding: 0.3rem 0.55rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+
+  .admin-editor-image-floating * {
+    cursor: pointer;
+  }
+
+  @media (max-width: 1023px) {
+    .admin-blog-head {
+      display: none;
+    }
+
+    .admin-blog-row {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas:
+        "identity action"
+        "status date"
+        "tags featured";
+    }
+
+    .admin-blog-row__identity {
+      grid-area: identity;
+    }
+
+    .admin-blog-pill {
+      grid-area: status;
+    }
+
+    .admin-blog-row__date {
+      grid-area: date;
+    }
+
+    .admin-blog-row__tags {
+      grid-area: tags;
+    }
+
+    .admin-blog-row__featured {
+      grid-area: featured;
+    }
+
+    .admin-blog-row__action {
+      grid-area: action;
+    }
+  }
+
+  @media (max-width: 767px) {
+    .admin-blog-dialog,
+    .admin-blog-dialog--compact {
+      width: 100vw;
+      max-width: none;
+      height: 100dvh;
+      max-height: none;
+      margin: 0;
+    }
+
+    .admin-blog-dialog__panel {
+      min-height: 100dvh;
+      border-radius: 0 !important;
+    }
+
+    .admin-blog-dialog form {
+      max-height: 100dvh !important;
+    }
+
+    .admin-blog-dialog__header,
+    .admin-blog-dialog__footer {
+      position: sticky;
+      z-index: 5;
+    }
+
+    .admin-blog-dialog__header {
+      top: 0;
+    }
+
+    .admin-blog-toolbar {
+      align-items: stretch;
+    }
+
+    .admin-blog-search {
+      width: 100%;
+    }
+
+    .admin-blog-row {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas:
+        "identity"
+        "status"
+        "date"
+        "tags"
+        "featured";
+    }
+
+    .admin-blog-row__date,
+    .admin-blog-row__tags,
+    .admin-blog-row__featured,
+    .admin-blog-pill {
+      min-width: 0;
+      padding: 0.7rem 0.75rem;
+      border-radius: 0.95rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .admin-blog-row__action {
+      display: none;
+    }
+
+    .admin-blog-dialog__body {
+      padding-left: 1rem;
+      padding-right: 1rem;
+      padding-top: 1rem;
+      padding-bottom: 1rem;
+      scrollbar-gutter: stable;
+    }
+
+    .admin-blog-dialog__header,
+    .admin-blog-dialog__footer {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+
+    .admin-blog-dialog__body aside > div,
+    .admin-blog-dialog__body .space-y-5 > div {
+      padding: 1rem;
+      border-radius: 1.25rem;
+    }
+  }
+</style>
+
+<script>
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    const confirmSubmitTrigger = target.closest("[data-confirm-submit]");
+    if (confirmSubmitTrigger instanceof HTMLButtonElement) {
+      const message = confirmSubmitTrigger.dataset.confirmSubmit;
+      if (message && !window.confirm(message)) {
+        event.preventDefault();
+      }
+      return;
+    }
+
+    const openTrigger = target.closest("[data-open-dialog]");
+    if (openTrigger instanceof HTMLElement) {
+      const dialogId = openTrigger.dataset.openDialog;
+      const dialog = dialogId ? document.getElementById(dialogId) : null;
+      if (dialog instanceof HTMLDialogElement) {
+        dialog.showModal();
+      }
+      return;
+    }
+
+    const closeTrigger = target.closest("[data-close-dialog]");
+    if (closeTrigger instanceof HTMLElement) {
+      const dialog = closeTrigger.closest("dialog");
+      if (dialog instanceof HTMLDialogElement) {
+        dialog.close();
+      }
+      return;
+    }
+
+    const resetTrigger = target.closest("[data-reset-form]");
+    if (resetTrigger instanceof HTMLElement) {
+      const formNode = resetTrigger.closest("form");
+      if (!(formNode instanceof HTMLFormElement)) return;
+      formNode.reset();
+
+      formNode.querySelectorAll("[data-rich-editor]").forEach((editorNode) => {
+        if (editorNode instanceof HTMLElement) {
+          editorNode.innerHTML = "";
+        }
+      });
+      formNode.querySelectorAll("[data-rich-output]").forEach((outputNode) => {
+        if (outputNode instanceof HTMLTextAreaElement) {
+          outputNode.value = "";
+        }
+      });
+    }
+  });
+
+  document.addEventListener("input", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (!target.matches("[data-blog-search]")) return;
+
+    const query = target.value.trim().toLowerCase();
+    const rows = document.querySelectorAll("[data-blog-row]");
+    let visibleCount = 0;
+
+    rows.forEach((row) => {
+      if (!(row instanceof HTMLElement)) return;
+      const value = row.dataset.blogSearchValue || "";
+      const match = !query || value.includes(query);
+      row.style.display = match ? "" : "none";
+      if (match) visibleCount += 1;
+    });
+
+    const emptyState = document.querySelector("[data-blog-empty]");
+    if (emptyState instanceof HTMLElement) {
+      emptyState.classList.toggle("hidden", visibleCount > 0);
+    }
+  });
+
+  document.querySelectorAll("dialog[data-admin-dialog]").forEach((dialogNode) => {
+    if (!(dialogNode instanceof HTMLDialogElement)) return;
+
+    dialogNode.addEventListener("cancel", () => {
+      dialogNode.close();
+    });
+
+    dialogNode.addEventListener("click", (event) => {
+      if (event.target === dialogNode) {
+        dialogNode.close();
+      }
+    });
+  });
+
+  function syncEditorOutput(container) {
+    const surface = container.querySelector("[data-rich-editor]");
+    const output = container.querySelector("[data-rich-output]");
+    if (!(surface instanceof HTMLElement) || !(output instanceof HTMLTextAreaElement)) return;
+    output.value = surface.innerHTML.trim();
+  }
+
+  async function uploadPastedImage(file, slugHint) {
+    const payload = new FormData();
+    payload.set("action", "upload-blog-image");
+    payload.set("image", file);
+    payload.set("slug", slugHint || "blog");
+
+    const response = await fetch("/consultant/api/admin/manage", {
+      method: "POST",
+      body: payload,
+      credentials: "same-origin"
+    });
+
+    const json = await response.json();
+    if (!response.ok || !json?.ok || !json?.imageUrl) {
+      throw new Error(json?.message || "No pudimos subir la imagen pegada.");
+    }
+
+    return json.imageUrl;
+  }
+
+  function adjustSelectedImageWidth(editor, deltaPercent) {
+    const selection = window.getSelection();
+    const node = selection?.anchorNode;
+    if (!node) return;
+    const image = node instanceof HTMLImageElement ? node : node.parentElement?.closest("img");
+    if (!(image instanceof HTMLImageElement) || !editor.contains(image)) return;
+
+    const currentWidth = Number.parseInt(image.style.width || "100", 10);
+    const nextWidth = Math.max(20, Math.min(100, currentWidth + deltaPercent));
+    image.style.width = `${nextWidth}%`;
+  }
+
+  function applyFontSize(surface, sizePx) {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+    if (range.collapsed) return;
+    const span = document.createElement("span");
+    span.style.fontSize = `${sizePx}px`;
+    try {
+      range.surroundContents(span);
+    } catch {
+      document.execCommand("fontSize", false, "4");
+      surface.querySelectorAll("font[size='4']").forEach((node) => {
+        if (node instanceof HTMLElement) {
+          node.style.fontSize = `${sizePx}px`;
+          node.removeAttribute("size");
+        }
+      });
+    }
+  }
+
+  function applyFontFamily(surface, fontFamily) {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+    if (range.collapsed) return;
+    if (!fontFamily || fontFamily === "inherit") return;
+
+    const span = document.createElement("span");
+    span.style.fontFamily = fontFamily;
+    try {
+      range.surroundContents(span);
+    } catch {
+      document.execCommand("fontName", false, fontFamily);
+      surface.querySelectorAll("font").forEach((node) => {
+        if (node instanceof HTMLElement) {
+          node.style.fontFamily = fontFamily;
+          node.removeAttribute("face");
+        }
+      });
+    }
+  }
+
+  function clearImageSelection(surface) {
+    surface.querySelectorAll("img.is-selected").forEach((imageNode) => {
+      imageNode.classList.remove("is-selected");
+    });
+    const wrapperNode = surface.closest(".admin-editor-shell");
+    const toolbarNode = wrapperNode?.querySelector(".admin-editor-image-floating");
+    if (toolbarNode instanceof HTMLElement) {
+      toolbarNode.classList.add("hidden");
+    }
+  }
+
+  function clearLayoutBlockSelection(surface) {
+    surface.querySelectorAll(".editor-layout-block.is-selected").forEach((blockNode) => {
+      if (blockNode instanceof HTMLElement) blockNode.classList.remove("is-selected");
+    });
+  }
+
+  function clearLayoutBlockFocus(surface) {
+    surface.querySelectorAll(".editor-layout-block__text").forEach((textNode) => {
+      if (textNode instanceof HTMLElement) {
+        textNode.blur();
+      }
+    });
+  }
+
+  function placeCaretInLayoutTextBlock(blockNode, clientX, clientY) {
+    if (!(blockNode instanceof HTMLElement)) return;
+    const textNode = blockNode.querySelector(".editor-layout-block__text");
+    if (!(textNode instanceof HTMLElement)) return;
+
+    textNode.focus({ preventScroll: true });
+
+    const clickRange = getRangeFromPoint(clientX, clientY);
+    const selection = window.getSelection();
+    if (!selection) return;
+
+    const isInsideTextNode =
+      clickRange &&
+      textNode.contains(clickRange.startContainer) &&
+      textNode.contains(clickRange.endContainer);
+
+    selection.removeAllRanges();
+    if (isInsideTextNode) {
+      selection.addRange(clickRange);
+      return;
+    }
+
+    const fallbackRange = document.createRange();
+    fallbackRange.selectNodeContents(textNode);
+    fallbackRange.collapse(false);
+    selection.addRange(fallbackRange);
+  }
+
+  function ensureFloatingImageToolbar(wrapperNode) {
+    const existing = wrapperNode.querySelector(".admin-editor-image-floating");
+    if (existing instanceof HTMLElement) return existing;
+
+    const toolbar = document.createElement("div");
+    toolbar.className = "admin-editor-image-floating hidden";
+    toolbar.innerHTML = `
+      <button type="button" data-editor-action="move-image-left">Img ←</button>
+      <button type="button" data-editor-action="move-image-right">Img →</button>
+      <button type="button" data-editor-action="decrease-image">- Img</button>
+      <button type="button" data-editor-action="increase-image">+ Img</button>
+    `;
+    wrapperNode.appendChild(toolbar);
+    return toolbar;
+  }
+
+  function getSurfacePoint(surface, clientX, clientY) {
+    const rect = surface.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(rect.width, clientX - rect.left + surface.scrollLeft)),
+      y: Math.max(0, Math.min(rect.height, clientY - rect.top + surface.scrollTop))
+    };
+  }
+
+  async function createLayoutBlock(surface, kind, rect, formNode) {
+    const block = document.createElement("div");
+    block.className = "editor-layout-block";
+    block.dataset.layoutBlock = kind;
+    block.style.left = `${rect.x}px`;
+    block.style.top = `${rect.y}px`;
+    block.style.width = `${Math.max(120, rect.w)}px`;
+    block.style.height = `${Math.max(60, rect.h)}px`;
+
+    if (kind === "text") {
+      const text = document.createElement("div");
+      text.className = "editor-layout-block__text";
+      text.contentEditable = "true";
+      text.innerHTML = "<p>Escribe aqui...</p>";
+      block.appendChild(text);
+    } else if (kind === "image") {
+      const mode = window.prompt("Imagen: escribe URL / PEGAR / SUBIR", "URL");
+      let imageUrl = "";
+      if (!mode) return null;
+      const normalizedMode = mode.trim().toLowerCase();
+      if (normalizedMode === "url") {
+        imageUrl = window.prompt("URL de la imagen") ?? "";
+      } else if (normalizedMode === "pegar") {
+        if (!navigator.clipboard?.read) {
+          window.alert("Tu navegador no permite leer imagenes del portapapeles aqui.");
+          return null;
+        }
+        const items = await navigator.clipboard.read();
+        const imageClipboardItem = items.find((item) => item.types.some((t) => t.startsWith("image/")));
+        if (!imageClipboardItem) {
+          window.alert("No encontramos una imagen en el portapapeles.");
+          return null;
+        }
+        const type = imageClipboardItem.types.find((t) => t.startsWith("image/"));
+        if (!type) return null;
+        const blob = await imageClipboardItem.getType(type);
+        const file = new File([blob], `clipboard-${Date.now()}.png`, { type: blob.type || "image/png" });
+        const slugInput = formNode?.querySelector("input[name='slug']");
+        imageUrl = await uploadPastedImage(file, slugInput instanceof HTMLInputElement ? slugInput.value : "blog");
+      } else if (normalizedMode === "subir") {
+        const picker = document.createElement("input");
+        picker.type = "file";
+        picker.accept = "image/png,image/jpeg,image/webp,image/gif";
+        const selectedFile = await new Promise((resolve) => {
+          picker.addEventListener("change", () => resolve(picker.files?.[0] ?? null), { once: true });
+          picker.click();
+        });
+        if (!(selectedFile instanceof File)) return null;
+        const slugInput = formNode?.querySelector("input[name='slug']");
+        imageUrl = await uploadPastedImage(selectedFile, slugInput instanceof HTMLInputElement ? slugInput.value : "blog");
+      } else {
+        window.alert("Usa: URL, PEGAR o SUBIR");
+        return null;
+      }
+      if (!imageUrl) return null;
+      block.innerHTML = `<img src="${imageUrl}" style="width:100%;height:100%;object-fit:contain;border-radius:.45rem;" draggable="false" />`;
+    } else if (kind === "link") {
+      const linkText = window.prompt("Texto del link") ?? "";
+      const href = window.prompt("URL del link") ?? "";
+      if (!href) return null;
+      block.innerHTML = `<a href="${href}" target="_blank" rel="noopener noreferrer" style="color:#ffb979;text-decoration:underline;">${linkText || href}</a>`;
+    }
+
+    const resize = document.createElement("span");
+    resize.className = "editor-layout-block__resize";
+    block.appendChild(resize);
+    surface.appendChild(block);
+    return block;
+  }
+
+  function updateFloatingImageToolbar(wrapperNode, selectedImage) {
+    const toolbar = ensureFloatingImageToolbar(wrapperNode);
+    if (!(selectedImage instanceof HTMLImageElement)) {
+      toolbar.classList.add("hidden");
+      return;
+    }
+
+    const wrapperRect = wrapperNode.getBoundingClientRect();
+    const imageRect = selectedImage.getBoundingClientRect();
+    const toolbarWidth = toolbar.offsetWidth || 220;
+    const toolbarHeight = toolbar.offsetHeight || 36;
+    const desiredLeft = imageRect.left - wrapperRect.left + imageRect.width / 2 - toolbarWidth / 2;
+    const left = Math.max(0, Math.min(desiredLeft, wrapperRect.width - toolbarWidth));
+    let top = imageRect.bottom - wrapperRect.top + 8;
+    const maxTop = Math.max(0, wrapperRect.height - toolbarHeight);
+    if (top > maxTop) {
+      top = Math.max(0, imageRect.top - wrapperRect.top - toolbarHeight - 8);
+    }
+
+    toolbar.style.left = `${left}px`;
+    toolbar.style.top = `${top}px`;
+    toolbar.classList.remove("hidden");
+  }
+
+  function normalizeEditorImages(surface) {
+    surface.querySelectorAll("img").forEach((imageNode) => {
+      if (!(imageNode instanceof HTMLImageElement)) return;
+
+      const parent = imageNode.parentElement;
+      if (parent instanceof HTMLElement && parent.matches("figure.editor-image")) {
+        return;
+      }
+
+      const figure = document.createElement("figure");
+      figure.className = "editor-image is-center";
+      parent?.insertBefore(figure, imageNode);
+      figure.appendChild(imageNode);
+    });
+
+    surface.querySelectorAll("figure.editor-image").forEach((figureNode) => {
+      if (!(figureNode instanceof HTMLElement)) return;
+      const image = figureNode.querySelector("img");
+      const onlyImageChild =
+        figureNode.childNodes.length === 1 &&
+        figureNode.firstChild instanceof HTMLImageElement;
+      if (!onlyImageChild && image) {
+        figureNode.replaceChildren(image);
+      }
+    });
+  }
+
+  function ensureEditorImagesInteractive(surface) {
+    normalizeEditorImages(surface);
+
+    surface.querySelectorAll("img").forEach((node) => {
+      if (!(node instanceof HTMLImageElement)) return;
+      node.draggable = true;
+      if (!node.style.maxWidth) node.style.maxWidth = "100%";
+      if (!node.style.height) node.style.height = "auto";
+      if (!node.style.display) node.style.display = "block";
+      if (!node.style.width || node.style.width.endsWith("%")) {
+        const fallback = Math.round((surface.clientWidth || 800) * 0.6);
+        node.style.width = `${Math.max(220, fallback)}px`;
+      }
+    });
+  }
+
+  function getRangeFromPoint(clientX, clientY) {
+    if (document.caretPositionFromPoint) {
+      const position = document.caretPositionFromPoint(clientX, clientY);
+      if (!position) return null;
+      const range = document.createRange();
+      range.setStart(position.offsetNode, position.offset);
+      range.collapse(true);
+      return range;
+    }
+
+    if (document.caretRangeFromPoint) {
+      return document.caretRangeFromPoint(clientX, clientY);
+    }
+
+    return null;
+  }
+
+  function classifyHorizontalPlacement(surface, clientX) {
+    const bounds = surface.getBoundingClientRect();
+    const ratio = (clientX - bounds.left) / Math.max(bounds.width, 1);
+    if (ratio < 0.33) return "is-left";
+    if (ratio > 0.66) return "is-right";
+    return "is-center";
+  }
+
+  function applyImagePlacementClass(figureNode, placement) {
+    if (!(figureNode instanceof HTMLElement)) return;
+    figureNode.classList.remove("is-left", "is-right", "is-center", "is-free");
+    figureNode.classList.add(placement);
+  }
+
+  function applyFreeHorizontalPlacement(surface, figureNode, clientX) {
+    if (!(figureNode instanceof HTMLElement)) return;
+    const surfaceRect = surface.getBoundingClientRect();
+    const figureRect = figureNode.getBoundingClientRect();
+    const width = Math.max(1, figureRect.width);
+    const maxLeft = Math.max(0, surfaceRect.width - width);
+    const targetLeft = Math.min(
+      maxLeft,
+      Math.max(0, clientX - surfaceRect.left - width / 2)
+    );
+    const leftPercent = (targetLeft / Math.max(surfaceRect.width, 1)) * 100;
+
+    applyImagePlacementClass(figureNode, "is-free");
+    figureNode.style.marginLeft = `${leftPercent.toFixed(2)}%`;
+  }
+
+  function adjustSelectedImageHorizontalOffset(surface, deltaPercent) {
+    const selectedBlock = surface.querySelector(".editor-layout-block.is-selected");
+    if (selectedBlock instanceof HTMLElement) {
+      const currentLeft = Number.parseFloat(selectedBlock.style.left || "0") || 0;
+      const stepPx = deltaPercent < 0 ? -24 : deltaPercent > 0 ? 24 : 0;
+      const maxLeft = Math.max(0, surface.scrollWidth - selectedBlock.offsetWidth - 8);
+      const nextLeft = Math.max(0, Math.min(maxLeft, currentLeft + stepPx));
+      selectedBlock.style.left = `${nextLeft}px`;
+      return;
+    }
+
+    let selectedImage = surface.querySelector("img.is-selected");
+    if (!(selectedImage instanceof HTMLImageElement)) {
+      const selection = window.getSelection();
+      const anchorNode = selection?.anchorNode ?? null;
+      const anchorElement =
+        anchorNode instanceof HTMLElement
+          ? anchorNode
+          : anchorNode?.parentElement ?? null;
+      const fallbackImage = anchorElement?.closest("img");
+      if (fallbackImage instanceof HTMLImageElement && surface.contains(fallbackImage)) {
+        selectedImage = fallbackImage;
+        selectedImage.classList.add("is-selected");
+      }
+    }
+    if (!(selectedImage instanceof HTMLImageElement)) return;
+    const figure = selectedImage.closest("figure.editor-image");
+    if (!(figure instanceof HTMLElement)) return;
+    // Immediate behavior: one click moves to left/right float and text wraps around.
+    if (deltaPercent < 0) {
+      applyImagePlacementClass(figure, "is-left");
+      figure.style.float = "left";
+      figure.style.clear = "none";
+      figure.style.margin = "0.8rem 1rem 0.8rem 0";
+    } else if (deltaPercent > 0) {
+      applyImagePlacementClass(figure, "is-right");
+      figure.style.float = "right";
+      figure.style.clear = "none";
+      figure.style.margin = "0.8rem 0 0.8rem 1rem";
+    } else {
+      applyImagePlacementClass(figure, "is-center");
+      figure.style.float = "none";
+      figure.style.clear = "both";
+      figure.style.margin = "0.9rem auto";
+    }
+  }
+
+  function moveCaretToParagraphAfterFigure(surface) {
+    const selectedImage = surface.querySelector("img.is-selected");
+    if (!(selectedImage instanceof HTMLImageElement)) return;
+    const figure = selectedImage.closest("figure.editor-image");
+    if (!(figure instanceof HTMLElement)) return;
+
+    let target = figure.nextElementSibling;
+    if (!(target instanceof HTMLElement)) {
+      target = document.createElement("p");
+      target.appendChild(document.createElement("br"));
+      figure.insertAdjacentElement("afterend", target);
+    }
+
+    const range = document.createRange();
+    range.selectNodeContents(target);
+    range.collapse(false);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    surface.focus();
+  }
+
+  function adjustSelectedImageWidthPx(surface, deltaPx) {
+    const selectedImage = surface.querySelector("img.is-selected");
+    if (!(selectedImage instanceof HTMLImageElement)) return;
+    const currentPx = Number.parseFloat((selectedImage.style.width || "0").replace("px", "")) || selectedImage.getBoundingClientRect().width;
+    const maxPx = Math.max(260, surface.clientWidth - 40);
+    const nextPx = Math.max(120, Math.min(maxPx, currentPx + deltaPx));
+    selectedImage.style.width = `${Math.round(nextPx)}px`;
+  }
+
+  function bindImageDragAndDrop(surface, wrapperNode) {
+    let draggedImage = null;
+
+    surface.addEventListener("dragstart", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLImageElement)) return;
+      draggedImage = target;
+      target.classList.add("is-dragging");
+      event.dataTransfer?.setData("text/plain", "editor-image");
+      if (event.dataTransfer) event.dataTransfer.effectAllowed = "move";
+    });
+
+    surface.addEventListener("dragover", (event) => {
+      if (!draggedImage) return;
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+    });
+
+    surface.addEventListener("drop", (event) => {
+      if (!draggedImage) return;
+      event.preventDefault();
+
+      const dropTarget = event.target instanceof HTMLElement ? event.target.closest("img") : null;
+      if (dropTarget instanceof HTMLImageElement && dropTarget !== draggedImage) {
+        const rect = dropTarget.getBoundingClientRect();
+        const placeAfter = event.clientY > rect.top + rect.height / 2;
+        const dragFigure = draggedImage.closest("figure.editor-image") ?? draggedImage;
+        const targetFigure = dropTarget.closest("figure.editor-image") ?? dropTarget;
+        targetFigure.parentNode?.insertBefore(
+          dragFigure,
+          placeAfter ? targetFigure.nextSibling : targetFigure
+        );
+        applyImagePlacementClass(
+          dragFigure instanceof HTMLElement ? dragFigure : null,
+          classifyHorizontalPlacement(surface, event.clientX)
+        );
+        if (dragFigure instanceof HTMLElement) {
+          applyFreeHorizontalPlacement(surface, dragFigure, event.clientX);
+        }
+      } else {
+        const range = getRangeFromPoint(event.clientX, event.clientY);
+        const dragNode = draggedImage.closest("figure.editor-image") ?? draggedImage;
+        const startContainer = range?.startContainer ?? null;
+        if (startContainer && dragNode.contains(startContainer)) {
+          draggedImage.classList.remove("is-dragging");
+          draggedImage.classList.add("is-selected");
+          syncEditorOutput(wrapperNode);
+          return;
+        }
+        if (range) {
+          try {
+            range.insertNode(dragNode);
+          } catch {
+            surface.appendChild(dragNode);
+          }
+        } else {
+          surface.appendChild(dragNode);
+        }
+        applyImagePlacementClass(
+          dragNode instanceof HTMLElement ? dragNode : null,
+          classifyHorizontalPlacement(surface, event.clientX)
+        );
+        if (dragNode instanceof HTMLElement) {
+          applyFreeHorizontalPlacement(surface, dragNode, event.clientX);
+        }
+      }
+
+      normalizeEditorImages(surface);
+      ensureEditorImagesInteractive(surface);
+      draggedImage.classList.remove("is-dragging");
+      draggedImage.classList.add("is-selected");
+      syncEditorOutput(wrapperNode);
+    });
+
+    surface.addEventListener("dragend", () => {
+      if (!draggedImage) return;
+      draggedImage.classList.remove("is-dragging");
+      draggedImage = null;
+      syncEditorOutput(wrapperNode);
+    });
+  }
+
+  function bindMouseImageResize(surface, wrapperNode) {
+    let activeImage = null;
+    let startX = 0;
+    let startWidth = 0;
+
+    surface.addEventListener("click", (event) => {
+      const target = event.target;
+      if (target instanceof HTMLImageElement) {
+        const wasSelected = target.classList.contains("is-selected");
+        clearImageSelection(surface);
+        if (!wasSelected) {
+          target.classList.add("is-selected");
+          updateFloatingImageToolbar(wrapperNode, target);
+        }
+        return;
+      }
+      clearImageSelection(surface);
+    });
+
+    surface.addEventListener("mousedown", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLImageElement)) return;
+      const bounds = target.getBoundingClientRect();
+      const nearRightBottom =
+        event.clientX >= bounds.right - 38 && event.clientY >= bounds.bottom - 38;
+      if (!nearRightBottom) return;
+
+      event.preventDefault();
+      activeImage = target;
+      startX = event.clientX;
+      startWidth = bounds.width;
+      target.classList.add("is-selected");
+    });
+
+    window.addEventListener("mousemove", (event) => {
+      if (!activeImage) return;
+      const delta = event.clientX - startX;
+      const surfaceWidth = surface.clientWidth || 1;
+      const nextWidthPx = Math.max(120, startWidth + delta);
+      const widthPercent = Math.max(20, Math.min(100, (nextWidthPx / surfaceWidth) * 100));
+      activeImage.style.width = `${widthPercent}%`;
+      syncEditorOutput(wrapperNode);
+    });
+
+    window.addEventListener("mouseup", () => {
+      activeImage = null;
+    });
+  }
+
+  function isPointerNearBlockEdge(blockNode, clientX, clientY, threshold = 10) {
+    const rect = blockNode.getBoundingClientRect();
+    if (
+      clientX < rect.left ||
+      clientX > rect.right ||
+      clientY < rect.top ||
+      clientY > rect.bottom
+    ) {
+      return false;
+    }
+
+    const distanceToLeft = clientX - rect.left;
+    const distanceToRight = rect.right - clientX;
+    const distanceToTop = clientY - rect.top;
+    const distanceToBottom = rect.bottom - clientY;
+
+    return (
+      distanceToLeft <= threshold ||
+      distanceToRight <= threshold ||
+      distanceToTop <= threshold ||
+      distanceToBottom <= threshold
+    );
+  }
+
+  document.querySelectorAll("form").forEach((formNode, formIndex) => {
+    if (!(formNode instanceof HTMLFormElement)) return;
+    let pendingEditorUploads = 0;
+    const actionInput = formNode.querySelector("input[name='action']");
+    const formAction = actionInput instanceof HTMLInputElement ? actionInput.value : "";
+    const shouldPersistDraft = formAction === "create-blog-post";
+    const draftKey = `admin-blog-form-draft-${formIndex}`;
+    const saveDraftState = () => {
+      const data = {};
+      formNode.querySelectorAll("input[name], textarea[name], select[name]").forEach((el) => {
+        if (el instanceof HTMLInputElement) {
+          if (el.type === "file") return;
+          if (el.type === "checkbox") data[el.name] = el.checked ? "1" : "0";
+          else data[el.name] = el.value;
+        } else if (el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
+          data[el.name] = el.value;
+        }
+      });
+      const editor = formNode.querySelector("[data-rich-editor]");
+      if (editor instanceof HTMLElement) data.__editor_html = editor.innerHTML;
+      sessionStorage.setItem(draftKey, JSON.stringify(data));
+    };
+    const restoreDraftState = () => {
+      const raw = sessionStorage.getItem(draftKey);
+      if (!raw) return;
+      try {
+        const data = JSON.parse(raw);
+        formNode.querySelectorAll("input[name], textarea[name], select[name]").forEach((el) => {
+          if (el instanceof HTMLInputElement) {
+            if (el.type === "file") return;
+            if (el.type === "checkbox") el.checked = data[el.name] === "1";
+            else if (typeof data[el.name] === "string") el.value = data[el.name];
+          } else if (el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
+            if (typeof data[el.name] === "string") el.value = data[el.name];
+          }
+        });
+        const editor = formNode.querySelector("[data-rich-editor]");
+        if (editor instanceof HTMLElement && typeof data.__editor_html === "string") {
+          editor.innerHTML = data.__editor_html;
+        }
+      } catch {}
+    };
+    if (shouldPersistDraft) {
+      restoreDraftState();
+    }
+
+    const editorWrappers = formNode.querySelectorAll(".admin-editor-shell");
+    editorWrappers.forEach((wrapperNode) => {
+      if (!(wrapperNode instanceof HTMLElement)) return;
+      const surface = wrapperNode.querySelector("[data-rich-editor]");
+      if (!(surface instanceof HTMLElement)) return;
+      const drawAreaButton = wrapperNode.querySelector("[data-editor-action='draw-area']");
+      let contentTool = "text";
+      let drawMode = false;
+      let ghost = null;
+      let drawStart = null;
+      let draggingBlock = null;
+      let dragOffset = { x: 0, y: 0 };
+      let resizingBlock = null;
+      let resizeStart = null;
+      let selectedBlockMode = "none"; // none | block | text
+      const setDrawMode = (enabled) => {
+        drawMode = enabled;
+        surface.classList.toggle("is-draw-mode", drawMode);
+        if (drawAreaButton instanceof HTMLElement) {
+          drawAreaButton.classList.toggle("is-active", drawMode);
+        }
+        if (!drawMode && ghost) {
+          ghost.remove();
+          ghost = null;
+        }
+      };
+
+      wrapperNode.addEventListener("click", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        const command = target.getAttribute("data-editor-command");
+        const action = target.getAttribute("data-editor-action");
+        if (!command && !action) return;
+
+        event.preventDefault();
+        surface.focus();
+
+        if (command === "createLink") {
+          const url = window.prompt("URL del link");
+          if (url) document.execCommand("createLink", false, url);
+        } else if (command === "insertImage") {
+          const url = window.prompt("URL de la imagen");
+          if (url) document.execCommand("insertImage", false, url);
+        } else if (command) {
+          document.execCommand(command, false);
+        }
+
+        if (action === "draw-area") {
+          setDrawMode(!drawMode);
+          return;
+        }
+
+        if (action === "increase-image") adjustSelectedImageWidthPx(surface, 30);
+        if (action === "decrease-image") adjustSelectedImageWidthPx(surface, -30);
+        if (action === "move-image-left") {
+          adjustSelectedImageHorizontalOffset(surface, -3);
+          moveCaretToParagraphAfterFigure(surface);
+        }
+        if (action === "move-image-right") {
+          adjustSelectedImageHorizontalOffset(surface, 3);
+          moveCaretToParagraphAfterFigure(surface);
+        }
+        updateFloatingImageToolbar(wrapperNode, surface.querySelector("img.is-selected"));
+        syncEditorOutput(wrapperNode);
+      });
+
+      wrapperNode.querySelectorAll(".admin-editor-toolbar button").forEach((buttonNode) => {
+        if (!(buttonNode instanceof HTMLButtonElement)) return;
+        buttonNode.addEventListener("mousedown", (event) => {
+          event.preventDefault();
+        });
+      });
+
+      wrapperNode.querySelectorAll(".admin-editor-toolbar select").forEach((selectNode) => {
+        if (!(selectNode instanceof HTMLSelectElement)) return;
+        selectNode.addEventListener("mousedown", (event) => {
+          event.stopPropagation();
+        });
+      });
+
+      wrapperNode.addEventListener("change", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLSelectElement)) return;
+        const editorSelect = target.getAttribute("data-editor-select");
+        if (!editorSelect) return;
+        surface.focus();
+
+        if (editorSelect === "content-type") {
+          contentTool = target.value || "text";
+          target.classList.add("is-active");
+          setDrawMode(true);
+          return;
+        }
+
+        if (editorSelect === "font-size") {
+          const nextSize = Number.parseInt(target.value, 10);
+          if (!Number.isNaN(nextSize)) {
+            applyFontSize(surface, nextSize);
+          }
+        }
+
+        if (editorSelect === "font-family") {
+          applyFontFamily(surface, target.value);
+        }
+
+        syncEditorOutput(wrapperNode);
+      });
+
+      surface.addEventListener("input", () => {
+        normalizeEditorImages(surface);
+        ensureEditorImagesInteractive(surface);
+        updateFloatingImageToolbar(wrapperNode, surface.querySelector("img.is-selected"));
+        syncEditorOutput(wrapperNode);
+      });
+      surface.addEventListener("mousedown", (event) => {
+        if (!(event.target instanceof HTMLElement)) return;
+        if (event.target.closest(".admin-editor-toolbar")) return;
+        if (event.target.closest(".admin-editor-image-floating")) return;
+        const clickedBlock = event.target.closest(".editor-layout-block");
+        if (!(clickedBlock instanceof HTMLElement)) {
+          selectedBlockMode = "none";
+          clearLayoutBlockSelection(surface);
+          clearLayoutBlockFocus(surface);
+        }
+
+        const resizeHandle = event.target.closest(".editor-layout-block__resize");
+        if (resizeHandle instanceof HTMLElement) {
+          resizingBlock = resizeHandle.closest(".editor-layout-block");
+          if (resizingBlock instanceof HTMLElement) {
+            const rect = resizingBlock.getBoundingClientRect();
+            resizeStart = {
+              x: event.clientX,
+              y: event.clientY,
+              w: rect.width,
+              h: rect.height
+            };
+            event.preventDefault();
+            return;
+          }
+        }
+
+        const block = clickedBlock;
+        if (block instanceof HTMLElement && !drawMode) {
+          const textBlock = event.target.closest(".editor-layout-block__text");
+          surface.querySelectorAll(".editor-layout-block.is-selected").forEach((node) => {
+            if (node instanceof HTMLElement) node.classList.remove("is-selected");
+          });
+          block.classList.add("is-selected");
+          clearImageSelection(surface);
+
+          if (
+            textBlock instanceof HTMLElement &&
+            !isPointerNearBlockEdge(block, event.clientX, event.clientY)
+          ) {
+            selectedBlockMode = "text";
+            placeCaretInLayoutTextBlock(block, event.clientX, event.clientY);
+            draggingBlock = null;
+            return;
+          }
+
+          selectedBlockMode = "block";
+          draggingBlock = block;
+          const point = getSurfacePoint(surface, event.clientX, event.clientY);
+          dragOffset = {
+            x: point.x - (Number.parseFloat(block.style.left || "0") || 0),
+            y: point.y - (Number.parseFloat(block.style.top || "0") || 0)
+          };
+          event.preventDefault();
+          return;
+        }
+
+        if (drawMode) {
+          selectedBlockMode = "none";
+          drawStart = getSurfacePoint(surface, event.clientX, event.clientY);
+          ghost = document.createElement("div");
+          ghost.className = "admin-editor-draw-ghost";
+          ghost.style.left = `${drawStart.x}px`;
+          ghost.style.top = `${drawStart.y}px`;
+          ghost.style.width = "0px";
+          ghost.style.height = "0px";
+          surface.appendChild(ghost);
+          event.preventDefault();
+          return;
+        }
+
+        const image = event.target.closest("img");
+        if (image instanceof HTMLImageElement) {
+          selectedBlockMode = "none";
+          clearLayoutBlockSelection(surface);
+          const wasSelected = image.classList.contains("is-selected");
+          clearImageSelection(surface);
+          if (!wasSelected) {
+            image.classList.add("is-selected");
+            updateFloatingImageToolbar(wrapperNode, image);
+          }
+        } else {
+          selectedBlockMode = "none";
+          clearLayoutBlockSelection(surface);
+          clearImageSelection(surface);
+        }
+        surface.focus();
+      });
+      window.addEventListener("mousemove", (event) => {
+        if (drawMode && drawStart && ghost) {
+          const point = getSurfacePoint(surface, event.clientX, event.clientY);
+          const left = Math.min(drawStart.x, point.x);
+          const top = Math.min(drawStart.y, point.y);
+          const width = Math.abs(point.x - drawStart.x);
+          const height = Math.abs(point.y - drawStart.y);
+          ghost.style.left = `${left}px`;
+          ghost.style.top = `${top}px`;
+          ghost.style.width = `${width}px`;
+          ghost.style.height = `${height}px`;
+          return;
+        }
+
+        if (draggingBlock) {
+          const point = getSurfacePoint(surface, event.clientX, event.clientY);
+          const x = Math.max(0, point.x - dragOffset.x);
+          const y = Math.max(0, point.y - dragOffset.y);
+          draggingBlock.style.left = `${x}px`;
+          draggingBlock.style.top = `${y}px`;
+          syncEditorOutput(wrapperNode);
+          return;
+        }
+
+        if (resizingBlock && resizeStart) {
+          const nextW = Math.max(100, resizeStart.w + (event.clientX - resizeStart.x));
+          const nextH = Math.max(50, resizeStart.h + (event.clientY - resizeStart.y));
+          resizingBlock.style.width = `${nextW}px`;
+          resizingBlock.style.height = `${nextH}px`;
+          syncEditorOutput(wrapperNode);
+        }
+      });
+      window.addEventListener("mouseup", () => {
+        if (drawMode && drawStart && ghost) {
+          const left = Number.parseFloat(ghost.style.left || "0");
+          const top = Number.parseFloat(ghost.style.top || "0");
+          const width = Number.parseFloat(ghost.style.width || "0");
+          const height = Number.parseFloat(ghost.style.height || "0");
+          ghost.remove();
+          ghost = null;
+          drawStart = null;
+
+          if (width >= 16 && height >= 16) {
+            const block = createLayoutBlock(surface, contentTool, { x: left, y: top, w: width, h: height }, formNode);
+            Promise.resolve(block).then((resolvedBlock) => {
+            if (resolvedBlock) {
+              surface.querySelectorAll(".editor-layout-block.is-selected").forEach((node) => {
+                if (node instanceof HTMLElement) node.classList.remove("is-selected");
+              });
+              resolvedBlock.classList.add("is-selected");
+              selectedBlockMode = "block";
+              syncEditorOutput(wrapperNode);
+            }
+            });
+          }
+          setDrawMode(false);
+        }
+        draggingBlock = null;
+        resizingBlock = null;
+        resizeStart = null;
+      });
+      surface.addEventListener("blur", () => syncEditorOutput(wrapperNode));
+      surface.addEventListener("keydown", (event) => {
+        if (event.key !== "Delete" && event.key !== "Backspace") return;
+
+        const selectedBlock = surface.querySelector(".editor-layout-block.is-selected");
+        if (!(selectedBlock instanceof HTMLElement)) return;
+
+        if (selectedBlockMode === "text") {
+          return;
+        }
+
+        event.preventDefault();
+        selectedBlock.remove();
+        selectedBlockMode = "none";
+        syncEditorOutput(wrapperNode);
+      });
+      ensureEditorImagesInteractive(surface);
+
+      surface.addEventListener("paste", async (event) => {
+        const clipboardItems = event.clipboardData?.items ?? [];
+        const imageItems = Array.from(clipboardItems).filter((item) => item.type.startsWith("image/"));
+        if (imageItems.length === 0) return;
+
+        event.preventDefault();
+        pendingEditorUploads += imageItems.length;
+
+        for (const imageItem of imageItems) {
+          const file = imageItem.getAsFile();
+          if (!file) {
+            pendingEditorUploads -= 1;
+            continue;
+          }
+
+          try {
+            const slugInput = formNode.querySelector("input[name='slug']");
+            const imageUrl = await uploadPastedImage(
+              file,
+              slugInput instanceof HTMLInputElement ? slugInput.value : "blog"
+            );
+            document.execCommand("insertImage", false, imageUrl);
+            normalizeEditorImages(surface);
+            ensureEditorImagesInteractive(surface);
+            syncEditorOutput(wrapperNode);
+          } catch (error) {
+            window.alert(error instanceof Error ? error.message : "No pudimos subir la imagen.");
+          } finally {
+            pendingEditorUploads -= 1;
+          }
+        }
+      });
+
+      bindMouseImageResize(surface, wrapperNode);
+      bindImageDragAndDrop(surface, wrapperNode);
+
+      syncEditorOutput(wrapperNode);
+      if (shouldPersistDraft) {
+        formNode.addEventListener("input", saveDraftState);
+        formNode.addEventListener("change", saveDraftState);
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "hidden") saveDraftState();
+        });
+      }
+    });
+
+    formNode.addEventListener("submit", (event) => {
+      if (pendingEditorUploads > 0) {
+        event.preventDefault();
+        window.alert("Aun estamos subiendo imagenes del contenido. Espera unos segundos e intenta guardar nuevamente.");
+        return;
+      }
+      editorWrappers.forEach((wrapperNode) => {
+        if (wrapperNode instanceof HTMLElement) syncEditorOutput(wrapperNode);
+      });
+    });
+  });
+</script>

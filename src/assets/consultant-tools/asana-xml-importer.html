@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Asana XML Importer | Technized Consultant</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            asana: {
+              coral: '#F06A6A',     // Primary Action
+              coralDark: '#D65555', // Hover
+              ink: '#151B26',       // Headings
+              slate: '#6D7175',     // Body text
+              bg: '#F6F8F9',        // App Background
+              surface: '#FFFFFF',   // Cards
+              border: '#CFD6E6',    // Stronger borders
+              success: '#0C6B58',   // Success text
+              successBg: '#E7F9EF', // Success bg
+            }
+          },
+          boxShadow: {
+            'input': '0 1px 2px rgba(0, 0, 0, 0.05)',
+            'card': '0 1px 0 rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.07)',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body { background-color: #F6F8F9; color: #151B26; -webkit-font-smoothing: antialiased; }
+    
+    @keyframes slideUpFade { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-enter { animation: slideUpFade 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+
+    .btn-polaris { transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
+    .btn-polaris:hover:not(:disabled) { transform: translateY(-1px); }
+    .btn-polaris:active:not(:disabled) { transform: scale(0.98); }
+
+    .input-polaris { transition: all 0.2s ease; background-color: #F9FAFB; border: 1px solid #D1D5DB; }
+    .input-polaris:hover { background-color: #FFFFFF; border-color: #9CA3AF; }
+    .input-polaris:focus { background-color: #FFFFFF; border-color: #F06A6A; box-shadow: 0 0 0 3px rgba(240, 106, 106, 0.15); outline: none; }
+    
+    .input-readonly { background-color: #F3F4F6; color: #6B7280; border-color: #E5E7EB; cursor: not-allowed; }
+
+    /* Scrollbar & Switch */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: #CBD5E0; border-radius: 4px; border: 2px solid #F6F8F9; }
+    .switch-checkbox { appearance: none; width: 40px; height: 22px; background: #E2E8F0; border-radius: 99px; position: relative; cursor: pointer; transition: 0.3s; border: 1px solid #CBD5E0; }
+    .switch-checkbox::after { content: ''; position: absolute; top: 1px; left: 1px; width: 18px; height: 18px; background: white; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,0.2); transition: 0.3s cubic-bezier(0.4, 0.0, 0.2, 1); }
+    .switch-checkbox:checked { background: #F06A6A; border-color: #F06A6A; }
+    .switch-checkbox:checked::after { transform: translateX(18px); }
+    
+    .backdrop-blur-glass { backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+    .header-btn { color: #6D7175; border: 1px solid transparent; transition: all 0.2s; }
+    .header-btn:hover { color: #151B26; background: #F1F2F4; border-color: #E1E3E5; }
+  </style>
+  <link rel="stylesheet" href="/consultant/apps/consultant/tool-overrides.css">
+</head>
+<body class="consultant-tool consultant-asana flex flex-col min-h-screen selection:bg-asana-coral selection:text-white">
+
+  <input type="file" id="configFileInput" accept=".json" class="hidden" />
+
+  <header class="sticky top-0 z-40 w-full bg-white border-b border-gray-200 shadow-sm">
+    <div class="max-w-5xl mx-auto px-6 h-18 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF7A7A] to-[#F06A6A] flex items-center justify-center shadow-lg shadow-red-100 text-white">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zm0 9l2.5-1.25L12 8.5l-2.5 1.25L12 11zm0 2.5l-5-2.5-5 2.5L12 22l10-8.5-5-2.5-5 2.5z"/></svg>
+        </div>
+        <div>
+          <h1 class="font-bold text-asana-ink text-xl tracking-tight leading-none">Asana XML Importer</h1>
+          <div class="flex items-center gap-2 mt-1">
+            <span class="text-[10px] font-bold text-asana-coral bg-red-50 px-2 py-0.5 rounded border border-red-100 uppercase tracking-wider">Consultant</span>
+            <span class="text-[10px] text-gray-400 font-medium">MS Project a Asana</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="flex items-center gap-2">
+        <div class="flex items-center bg-gray-50 rounded-lg p-1 border border-gray-200 mr-2">
+            <button id="btnImportConfig" class="header-btn w-9 h-9 flex items-center justify-center rounded-md" title="Importar Configuración">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            </button>
+            <div class="w-px h-5 bg-gray-300 mx-1"></div>
+            <button id="btnExportConfig" class="header-btn w-9 h-9 flex items-center justify-center rounded-md" title="Descargar Configuración">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            </button>
+        </div>
+
+        <button id="openDrawer" class="btn-polaris group flex items-center gap-2 pl-3 pr-4 h-10 rounded-lg bg-white border border-gray-300 text-asana-slate hover:text-asana-ink hover:border-gray-400 shadow-sm" title="Configuración Global">
+            <svg class="text-gray-400 group-hover:text-asana-coral transition-colors" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1 0-2.83 2 2 0 0 1 0 2.83l.06.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 0 2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            <span class="text-sm font-semibold">Configuración</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-grow max-w-5xl mx-auto w-full px-6 py-8 space-y-6">
+
+    <div class="bg-white rounded-xl border border-gray-300 shadow-card p-0 overflow-hidden animate-enter">
+      <div class="h-1.5 w-full bg-gradient-to-r from-asana-coral to-pink-500"></div>
+
+      <div class="p-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+          
+          <div class="space-y-6">
+            <div>
+              <label class="flex items-center gap-2 text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">
+                <span class="w-6 h-6 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-xs">1</span>
+                Origen de Datos
+              </label>
+              <div class="relative group">
+                <input type="file" id="xmlFile" accept=".xml" class="block w-full text-sm text-gray-700 file:mr-4 file:py-3 file:px-5 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-gray-100 file:text-asana-coral hover:file:bg-red-50 transition-all cursor-pointer border border-dashed border-gray-400 rounded-xl p-5 hover:border-asana-coral hover:bg-gray-50 bg-[#FCFCFD]" />
+              </div>
+              <div id="summary" class="mt-3 inline-flex items-center px-3 py-1 rounded-md text-xs font-semibold bg-gray-100 text-gray-500 border border-gray-200">
+                Esperando archivo...
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-6 border-l border-transparent md:border-gray-200 md:pl-10">
+            <label class="flex items-center gap-2 text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">
+                <span class="w-6 h-6 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center text-xs">2</span>
+                Destino
+            </label>
+            
+            <div class="flex items-center justify-between gap-4">
+              <div class="relative w-full">
+                <select id="mode" class="input-polaris w-full text-asana-ink text-sm font-medium rounded-lg p-3 appearance-none cursor-pointer shadow-input">
+                  <option value="create">Crear Proyecto Nuevo</option>
+                  <option value="sync">Actualizar Existente</option>
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+                  <svg class="fill-current h-4 w-4" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                </div>
+              </div>
+              
+              <label class="flex items-center gap-3 cursor-pointer select-none px-2 py-1 rounded hover:bg-gray-50 transition">
+                <input type="checkbox" id="dryRun" class="switch-checkbox shadow-sm" />
+                <span class="text-sm font-semibold text-gray-600">Dry-run</span>
+              </label>
+            </div>
+
+            <div class="space-y-4">
+               <div>
+                   <label class="block text-sm font-bold text-gray-700 mb-1.5">URL del Proyecto Asana</label>
+                   <input type="text" id="asanaUrl" placeholder="https://app.asana.com/0/..." class="input-polaris w-full text-asana-ink rounded-lg px-4 py-3 text-sm shadow-input placeholder-gray-400" />
+                   <p class="text-[11px] text-gray-500 mt-1.5 ml-1">Pega la URL para autodetectar Workspace y Equipo.</p>
+               </div>
+               
+               <div id="contextInfo" class="hidden p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-900 animate-enter shadow-sm">Detectando...</div>
+            </div>
+
+            <div id="projectNameContainer" class="pt-1 animate-enter">
+                <label class="block text-sm font-bold text-gray-700 mb-1.5">Nombre del Nuevo Proyecto</label>
+                <input type="text" id="projectName" placeholder="Ej: Migración Cronograma Q1" class="input-polaris w-full text-asana-ink rounded-lg px-4 py-3 text-sm shadow-input placeholder-gray-400" />
+            </div>
+
+            <div id="syncTargetContainer" class="hidden pt-1 animate-enter">
+                <label class="block text-sm font-bold text-gray-700 mb-1.5">Proyecto Destino (Detectado)</label>
+                <div class="relative">
+                    <input type="text" id="syncTargetName" readonly placeholder="Pega la URL para detectar el nombre..." class="input-polaris input-readonly w-full text-gray-600 rounded-lg px-4 py-3 text-sm shadow-inner" />
+                    <div class="absolute right-3 top-3 text-gray-400">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                    </div>
+                </div>
+                <p class="text-[11px] text-gray-500 mt-1.5 ml-1">Este es el proyecto que será actualizado/sobrescrito.</p>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="mt-10 pt-6 border-t border-gray-200 flex flex-wrap items-center gap-4">
+          <button id="runBtn" class="btn-polaris bg-asana-coral text-white font-bold py-3 px-8 rounded-lg shadow-lg shadow-red-200 hover:bg-asana-coralDark border border-transparent text-sm tracking-wide">
+            INICIAR IMPORTACIÓN
+          </button>
+          <button id="previewBtn" class="btn-polaris bg-white text-gray-700 font-semibold py-3 px-6 rounded-lg border border-gray-300 hover:border-gray-400 hover:bg-gray-50 text-sm shadow-input">
+            Previsualizar XML
+          </button>
+          <button id="previewSyncBtn" disabled class="btn-polaris disabled:opacity-50 disabled:cursor-not-allowed bg-white text-amber-700 font-semibold py-3 px-6 rounded-lg border border-amber-200 hover:bg-amber-50 text-sm shadow-sm">
+            Ver Plan de Sincronización
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="logCard" class="bg-[#1E1E1E] rounded-xl shadow-card overflow-hidden animate-enter delay-100 border border-gray-700">
+      <div class="px-5 py-3 border-b border-gray-700 flex items-center justify-between bg-[#252526]">
+        <div class="flex items-center gap-3">
+          <div class="flex gap-1.5">
+            <div class="w-3 h-3 rounded-full bg-[#FF5F56] shadow-sm"></div>
+            <div class="w-3 h-3 rounded-full bg-[#FFBD2E] shadow-sm"></div>
+            <div class="w-3 h-3 rounded-full bg-[#27C93F] shadow-sm"></div>
+          </div>
+          <span class="text-xs font-mono font-medium text-gray-400 ml-2 uppercase tracking-wider">Console Output</span>
+        </div>
+        <button id="clearLog" class="text-xs text-gray-400 hover:text-white transition-colors bg-white/5 px-2 py-1 rounded">Limpiar</button>
+      </div>
+      <div id="log" class="p-5 h-64 overflow-y-auto font-mono text-xs leading-relaxed text-gray-300 whitespace-pre-wrap scroll-smooth bg-[#1E1E1E]">
+        <div class="text-gray-500 italic">Esperando comandos...</div>
+      </div>
+    </div>
+  </main>
+
+  <div id="drawer" class="fixed inset-0 z-50 hidden transition-opacity duration-300" aria-hidden="true">
+    <div id="closeDrawer" class="absolute inset-0 bg-[#0d1017]/40 backdrop-blur-glass transition-opacity"></div>
+    <div class="absolute right-0 top-0 h-full w-[500px] bg-white shadow-2xl flex flex-col transform transition-transform duration-300 translate-x-full border-l border-gray-200" id="drawerPanel">
+      
+      <div class="px-8 py-6 border-b border-gray-200 flex items-center justify-between bg-white">
+        <h3 class="font-bold text-xl text-asana-ink">Configuración</h3>
+        <button id="closeDrawerBtn" class="text-gray-400 hover:text-asana-coral transition-colors p-2 hover:bg-red-50 rounded-full">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <div class="flex px-8 border-b border-gray-200 drawer-nav bg-gray-50/50">
+        <button class="tab-btn active py-4 px-4 text-sm font-bold text-asana-coral border-b-2 border-asana-coral transition-colors" data-tab="auth">Autenticación</button>
+        <button class="tab-btn py-4 px-4 text-sm font-bold text-gray-500 hover:text-asana-ink transition-colors border-b-2 border-transparent" data-tab="find">IDs</button>
+        <button class="tab-btn py-4 px-4 text-sm font-bold text-gray-500 hover:text-asana-ink transition-colors border-b-2 border-transparent" data-tab="import">Opciones</button>
+        <button class="tab-btn py-4 px-4 text-sm font-bold text-gray-500 hover:text-asana-ink transition-colors border-b-2 border-transparent" data-tab="custom-fields">Campos</button>
+      </div>
+
+      <div class="flex-grow overflow-y-auto p-8 bg-white drawer-content space-y-6">
+        <div id="tab-auth" class="tab-pane active space-y-6 animate-enter">
+          <div class="bg-white p-6 rounded-xl border border-gray-300 shadow-sm relative overflow-hidden">
+             <div class="absolute top-0 left-0 w-1 h-full bg-asana-coral"></div>
+            <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Credenciales</h4>
+            <label class="block text-sm font-bold text-asana-ink mb-2">Personal Access Token (PAT)</label>
+            <div class="relative flex items-center">
+              <input type="password" id="token" placeholder="Ej: 1/1203..." class="input-polaris w-full text-asana-ink rounded-lg px-4 py-3 text-sm pr-20 shadow-input" />
+              <button id="toggleToken" class="absolute right-2 text-xs font-bold text-asana-coral hover:text-red-700 px-3 py-1.5 rounded hover:bg-red-50 transition-colors">Mostrar</button>
+            </div>
+          </div>
+          <div class="bg-gray-50 p-6 rounded-xl border border-gray-300 shadow-inner">
+             <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-4">Workspace Principal</h4>
+             <input type="text" id="workspaceGid" placeholder="Detectado automáticamente" class="input-polaris w-full text-gray-600 rounded-lg px-4 py-3 text-sm bg-white" />
+          </div>
+          <button id="testConn" class="btn-polaris w-full bg-white border border-gray-300 text-asana-ink font-bold py-3 rounded-lg hover:bg-gray-50 hover:border-gray-400 shadow-sm transition-all">Probar Conexión</button>
+          <div id="connStatus" class="text-center text-xs font-bold mt-2 h-5"></div>
+        </div>
+
+        <div id="tab-find" class="tab-pane hidden space-y-6 animate-enter">
+          <div class="bg-blue-50 p-5 rounded-lg border border-blue-100 flex gap-3">
+             <svg class="text-blue-600 flex-shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+             <p class="text-xs text-blue-800 leading-relaxed font-medium">
+               Si la detección automática por URL falla, puedes ingresar el <strong>Team GID</strong> manualmente aquí.
+             </p>
+          </div>
+          <div>
+              <label class="block text-sm font-bold text-asana-ink mb-2">Team GID</label>
+              <input type="text" id="teamGid" placeholder="Opcional" class="input-polaris w-full rounded-lg px-4 py-3 text-sm shadow-input" />
+          </div>
+          <hr class="border-gray-100">
+          <button id="listWorkspaces" class="btn-polaris w-full bg-white border border-gray-300 text-gray-600 font-semibold py-2.5 rounded-lg text-sm shadow-sm">Listar Mis Workspaces</button>
+          <div id="wsList" class="space-y-2 mt-4 max-h-48 overflow-y-auto"></div>
+        </div>
+
+        <div id="tab-import" class="tab-pane hidden space-y-5 animate-enter">
+           <div class="bg-white p-6 rounded-xl border border-gray-300 shadow-sm space-y-4">
+             <label class="flex items-center gap-4 cursor-pointer group">
+               <input type="checkbox" id="skipDeps" class="w-5 h-5 text-asana-coral border-gray-300 rounded focus:ring-asana-coral transition-colors" />
+               <span class="text-sm font-medium text-gray-700 group-hover:text-asana-ink">No crear dependencias</span>
+             </label>
+             <label class="flex items-center gap-4 cursor-pointer group">
+               <input type="checkbox" id="skipStart" class="w-5 h-5 text-asana-coral border-gray-300 rounded focus:ring-asana-coral transition-colors" />
+               <span class="text-sm font-medium text-gray-700 group-hover:text-asana-ink">No enviar fecha de inicio</span>
+             </label>
+             <label class="flex items-center gap-4 cursor-pointer group">
+               <input type="checkbox" id="skipMilestone" class="w-5 h-5 text-asana-coral border-gray-300 rounded focus:ring-asana-coral transition-colors" />
+               <span class="text-sm font-medium text-gray-700 group-hover:text-asana-ink">No crear hitos</span>
+             </label>
+             <label class="flex items-center gap-4 cursor-pointer group">
+               <input type="checkbox" id="deleteObsolete" class="w-5 h-5 text-asana-coral border-gray-300 rounded focus:ring-asana-coral transition-colors" />
+               <span class="text-sm font-medium text-gray-700 group-hover:text-asana-ink">Eliminar tareas obsoletas (Sync)</span>
+             </label>
+           </div>
+           <div class="pt-2">
+             <label class="block text-sm font-bold text-asana-ink mb-2">Mapeo de Estado (GID)</label>
+             <input type="text" id="statusFieldGid" placeholder="GID del campo personalizado de Estado" class="input-polaris w-full rounded-lg px-4 py-3 text-sm shadow-input" />
+           </div>
+        </div>
+
+        <div id="tab-custom-fields" class="tab-pane hidden space-y-5 animate-enter">
+           <div id="customFieldMappingContainer" class="space-y-4"></div>
+           <div class="flex gap-4 pt-4 border-t border-gray-100">
+             <button id="addCustomFieldMappingBtn" class="flex-1 btn-polaris bg-white border border-dashed border-gray-400 text-gray-600 py-2.5 rounded-lg text-sm font-semibold hover:border-asana-coral hover:text-asana-coral hover:bg-red-50">
+               + Agregar Regla
+             </button>
+             <button id="loadAsanaCustomFieldsBtn" class="flex-1 btn-polaris bg-amber-50 border border-amber-200 text-amber-800 py-2.5 rounded-lg text-sm font-semibold hover:bg-amber-100">
+               Cargar Campos
+             </button>
+           </div>
+        </div>
+      </div>
+
+      <div class="p-8 border-t border-gray-200 bg-gray-50 z-10">
+        <button id="saveConfigBtn" class="btn-polaris w-full bg-asana-ink text-white font-bold py-3.5 rounded-lg shadow-lg hover:bg-gray-900 transition-all transform active:scale-95">
+          Guardar Configuración
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+  // ---------- UTILS ----------
+  function $(sel){ return document.querySelector(sel); }
+  function safeVal(sel, val) { 
+      var el = $(sel); 
+      if(el) { if(val !== undefined) el.value = val; return el.value; } 
+      return ''; 
+  }
+  function textContent(node, sel){ var el = node.querySelector(sel); return el ? (el.textContent||'').trim() : ''; }
+  
+  // FIX: Helper to escape HTML characters
+  function escapeHtml(text) {
+      if (!text) return "";
+      return text
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+  }
+
+  var logEl = $('#log');
+  var logCard = $('#logCard');
+  var originalLogCardHTML = logCard ? logCard.innerHTML : '';
+  
+  var state = { xmlDoc:null, tasks:[], resources:{}, parsed:false, detectedWs: null, detectedProj: null, detectedTeam: null, customFieldDefs: {} };
+  var customFieldMappings = [];
+  var availableAsanaFields = [];
+  var availableXmlFields = new Set();
+  var statusFieldOptions = {};
+
+  var LS = {
+    k: 'asana_importer_v42_percent',
+    save: function(obj){ localStorage.setItem(this.k, JSON.stringify(obj)); },
+    load: function(){ try { return JSON.parse(localStorage.getItem(this.k) || '{}'); } catch(e){ return {}; } }
+  };
+
+  function logLine(msg, type){
+    if (!logEl || !document.body.contains(logEl)) return;
+    var colorMap = { 'error': '#FF6B6B', 'warn': '#FFD166', 'ok': '#4CD964', 'muted': '#A0AEC0' }; 
+    var div = document.createElement('div');
+    div.style.color = colorMap[type] || '#D1D5DB';
+    div.style.marginBottom = '6px';
+    div.style.borderLeft = `2px solid ${colorMap[type] || '#4A5568'}`;
+    div.style.paddingLeft = '8px';
+    div.innerHTML = `<span style="opacity:0.5; font-size:10px; margin-right:8px; font-family:monospace">[${new Date().toLocaleTimeString()}]</span>` + msg;
+    logEl.appendChild(div);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+  
+  function restoreLogView() {
+    if(logCard && originalLogCardHTML) {
+        logCard.innerHTML = originalLogCardHTML;
+        logEl = $('#log');
+        $('#clearLog').onclick = () => { logEl.innerHTML = ''; };
+    }
+  }
+  
+  function isGid(s){ return typeof s==='string' && /^\d+$/.test(s.trim()); }
+  function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // ---------- IMPORT/EXPORT LOGIC ----------
+  function exportConfig() {
+      const config = LS.load();
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(config, null, 2));
+      const downloadAnchorNode = document.createElement('a');
+      downloadAnchorNode.setAttribute("href", dataStr);
+      downloadAnchorNode.setAttribute("download", "asana_importer_config_" + new Date().toISOString().slice(0,10) + ".json");
+      document.body.appendChild(downloadAnchorNode); 
+      downloadAnchorNode.click();
+      downloadAnchorNode.remove();
+      logLine("Configuración exportada exitosamente.", "ok");
+  }
+
+  function importConfig(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+          try {
+              const config = JSON.parse(e.target.result);
+              if (typeof config === 'object') {
+                  LS.save(config);
+                  alert('Configuración importada correctamente. La página se recargará.');
+                  location.reload();
+              } else {
+                  throw new Error("Formato inválido");
+              }
+          } catch(err) {
+              alert("Error al leer el archivo: " + err.message);
+              logLine("Error importando config: " + err.message, "error");
+          }
+      };
+      reader.readAsText(file);
+  }
+
+  // ---------- API CLIENT ----------
+  function authHeaders(){
+    var t = safeVal('#token').trim();
+    if(!t) throw new Error('Falta el Token (PAT). Configúralo en el menú.');
+    return { 'Authorization': 'Bearer '+t, 'Content-Type':'application/json; charset=UTF-8' };
+  }
+
+  function http(method, url, body){
+    return fetch(url, { method: method, headers: authHeaders(), body: body ? JSON.stringify({data: body}) : undefined })
+      .then(res => res.text().then(txt => ({ok: res.ok, status: res.status, txt: txt})))
+      .then(r => {
+        if(!r.ok){ throw new Error(r.status+' '+r.txt); }
+        return r.txt ? JSON.parse(r.txt) : {};
+      });
+  }
+
+  var API = {
+    base: 'https://app.asana.com/api/1.0',
+    getProject: (gid) => http('GET', `https://app.asana.com/api/1.0/projects/${gid}?opt_fields=name,workspace.name,workspace.gid,team.name,team.gid`).then(j => j.data),
+    createProject: (pl) => http('POST', 'https://app.asana.com/api/1.0/projects', pl).then(j => j.data),
+    updateProject: (gid, pl) => http('PUT', `https://app.asana.com/api/1.0/projects/${gid}`, pl).then(j => j.data),
+    listUsers: (ws) => http('GET', `https://app.asana.com/api/1.0/users?workspace=${ws}&limit=100&opt_fields=email,name`).then(j => j.data),
+    createTask: (pl) => http('POST', 'https://app.asana.com/api/1.0/tasks', pl).then(j => j.data),
+    updateTask: (gid, pl) => http('PUT', `https://app.asana.com/api/1.0/tasks/${gid}`, pl).then(j => j.data),
+    listSubtasks: (t) => http('GET', `https://app.asana.com/api/1.0/tasks/${t}/subtasks?opt_fields=name,notes,custom_fields&limit=100`).then(j => j.data),
+    listProjectTasks: (p) => http('GET', `https://app.asana.com/api/1.0/projects/${p}/tasks?opt_fields=name,notes,due_on,start_on,assignee,resource_subtype,completed,custom_fields&limit=100`).then(j => j.data),
+    listWorkspaceCustomFields: (ws) => http('GET', `https://app.asana.com/api/1.0/workspaces/${ws}/custom_fields?opt_fields=gid,name,type,enum_options.gid,enum_options.name`).then(j => j.data),
+    setParent: (c, p) => http('POST', `https://app.asana.com/api/1.0/tasks/${c}/setParent`, p),
+    addDependency: (d, on) => http('POST', `https://app.asana.com/api/1.0/tasks/${d}/addDependencies`, {dependencies:[on]}),
+    listWorkspaces: () => http('GET', 'https://app.asana.com/api/1.0/workspaces').then(j => j.data),
+    createSubtaskFlexible: (parent, payload) => http('POST', `https://app.asana.com/api/1.0/tasks/${parent}/subtasks`, payload).then(j => j.data)
+  };
+
+  // ---------- URL AUTO-RESOLVE LOGIC ----------
+  let resolveTimeout;
+  if($('#asanaUrl')) {
+      $('#asanaUrl').addEventListener('input', function() {
+          clearTimeout(resolveTimeout);
+          const url = this.value.trim();
+          const feedback = $('#contextInfo');
+          const syncInput = $('#syncTargetName');
+          
+          if (!safeVal('#token')) {
+              this.classList.remove('loading');
+              if(url.length > 5) {
+                  feedback.innerHTML = '<span class="flex items-center gap-2 font-bold">⚠️ Falta Token: Configúralo en el menú.</span>';
+                  feedback.className = 'p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800 animate-enter block shadow-sm';
+              }
+              return;
+          }
+
+          let detectedId = null;
+          const matchProj = url.match(/\/project\/(\d+)/);
+          if (matchProj) detectedId = matchProj[1];
+          if (!detectedId) { const matchZero = url.match(/\/0\/(\d+)/); if (matchZero) detectedId = matchZero[1]; }
+          if (!detectedId && /^\d+$/.test(url)) detectedId = url;
+
+          if (detectedId) {
+              this.classList.add('loading');
+              feedback.textContent = 'Consultando Asana...';
+              feedback.className = 'p-4 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 animate-enter block shadow-sm';
+              
+              resolveTimeout = setTimeout(() => {
+                  API.getProject(detectedId)
+                      .then(proj => {
+                          state.detectedProj = proj.gid;
+                          state.detectedWs = proj.workspace.gid;
+                          state.detectedTeam = proj.team ? proj.team.gid : null; 
+                          
+                          safeVal('#workspaceGid', proj.workspace.gid);
+                          safeVal('#teamGid', state.detectedTeam || ''); 
+                          
+                          // POPULATE SYNC TARGET FIELD
+                          if(syncInput) syncInput.value = proj.name;
+
+                          let html = `<div class="flex flex-col gap-1">`;
+                          html += `<div class="font-bold text-green-700 flex items-center gap-2"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"></polyline></svg> Proyecto: ${escHtml(proj.name)}</div>`;
+                          html += `<div class="text-green-800 ml-6">🏢 Workspace: <span class="font-medium">${escHtml(proj.workspace.name)}</span></div>`;
+                          if(proj.team) html += `<div class="text-green-800 ml-6">👥 Equipo: <span class="font-medium">${escHtml(proj.team.name)}</span></div>`;
+                          else html += `<div class="text-amber-600 ml-6 font-medium">⚠️ Sin equipo (Personal)</div>`;
+                          html += `</div>`;
+                          
+                          feedback.innerHTML = html;
+                          feedback.className = 'p-4 bg-green-50 border border-green-200 rounded-lg text-sm animate-enter block shadow-sm';
+                          
+                          this.classList.remove('loading');
+                          this.classList.add('success');
+                          logLine(`Contexto resuelto: ${proj.name}`, 'ok');
+                      })
+                      .catch(err => {
+                          feedback.innerHTML = '<strong>Error:</strong> No se encontró proyecto con ese ID.';
+                          feedback.className = 'p-4 bg-red-50 border border-red-200 rounded-lg text-sm text-red-800 animate-enter block shadow-sm';
+                          if(syncInput) syncInput.value = "Error: ID no encontrado";
+                          this.classList.remove('loading');
+                          this.classList.add('error');
+                          logLine('Error URL: ' + err.message, 'error');
+                      });
+              }, 600);
+          } else {
+              if (url.length < 20) {
+                 this.classList.remove('success', 'error', 'loading');
+                 feedback.classList.add('hidden');
+                 if(syncInput) syncInput.value = "";
+              }
+          }
+      });
+  }
+
+  // ---------- MAPPING UI ----------
+  function initCustomFieldMappingUI(){ 
+      const c = $('#customFieldMappingContainer'); if(!c) return; c.innerHTML=''; 
+      customFieldMappings.forEach(renderMappingRow); 
+  }
+  
+  function renderMappingRow(m){ 
+      const container = $('#customFieldMappingContainer');
+      const div = document.createElement('div'); 
+      div.className='bg-gray-50 p-4 border border-gray-200 rounded-lg animate-enter flex flex-col gap-3 shadow-sm'; 
+      div.innerHTML = `
+        <div class="flex items-end gap-3">
+          <div class="flex-1">
+            <label class="block text-[10px] uppercase font-bold text-gray-500 mb-1.5">Campo XML</label>
+            <select class="xml-select input-polaris w-full rounded text-sm py-2"><option value="">-- Seleccionar --</option></select>
+          </div>
+          <div class="flex items-center text-gray-400 pb-2">➔</div>
+          <div class="flex-1">
+            <label class="block text-[10px] uppercase font-bold text-gray-500 mb-1.5">Campo Asana</label>
+            <select class="asana-select input-polaris w-full rounded text-sm py-2"><option value="">-- Seleccionar --</option></select>
+          </div>
+          <button class="text-gray-400 hover:text-red-500 p-2 hover:bg-red-50 rounded transition-colors" title="Eliminar regla"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+        </div>`;
+      
+      const xmlSel = div.querySelector('.xml-select'); const asanaSel = div.querySelector('.asana-select'); const btn = div.querySelector('button');
+      [...availableXmlFields].sort().forEach(f => {
+          const opt = document.createElement('option'); opt.value = f;
+          if (f.startsWith('EA:')) { const id = f.split(':')[1]; const alias = state.customFieldDefs[id]; opt.textContent = alias ? `EA: ${alias} (${id})` : f; } else { opt.textContent = f; }
+          if(f === m.xmlField) opt.selected = true;
+          xmlSel.appendChild(opt);
+      });
+      availableAsanaFields.forEach(f => {
+          const opt = document.createElement('option'); opt.value = f.gid; opt.textContent = `${f.name} (${f.type})`;
+          if(f.gid === m.asanaFieldGid) opt.selected = true;
+          asanaSel.appendChild(opt);
+      });
+      xmlSel.onchange = () => { m.xmlField = xmlSel.value; }; asanaSel.onchange = () => { m.asanaFieldGid = asanaSel.value; };
+      btn.onclick = () => { customFieldMappings = customFieldMappings.filter(x => x !== m); initCustomFieldMappingUI(); };
+      container.appendChild(div);
+  }
+  
+  if($('#addCustomFieldMappingBtn')) $('#addCustomFieldMappingBtn').onclick=()=>{ customFieldMappings.push({id:Date.now(), xmlField:'', asanaFieldGid:''}); initCustomFieldMappingUI(); };
+  if($('#loadAsanaCustomFieldsBtn')) $('#loadAsanaCustomFieldsBtn').onclick=async()=>{ 
+      if(!safeVal('#workspaceGid')) { alert('Pega una URL primero para detectar el Workspace.'); return; }
+      try { logLine('Cargando campos de Asana...', 'muted'); availableAsanaFields = await API.listWorkspaceCustomFields(safeVal('#workspaceGid')); availableAsanaFields.sort((a,b) => a.name.localeCompare(b.name)); logLine(`Se cargaron ${availableAsanaFields.length} campos.`, 'ok'); initCustomFieldMappingUI(); } catch(e) { logLine('Error cargando campos: ' + e.message, 'error'); }
+  };
+
+  function parseXML(file){ return new Promise((r, j) => { var fr = new FileReader(); fr.onload = () => r((new DOMParser()).parseFromString(fr.result, 'text/xml')); fr.onerror = j; fr.readAsText(file); }); }
+  function parseProjectXML(doc){
+    state.customFieldDefs = {};
+    const eaDefs = doc.getElementsByTagName('ExtendedAttribute');
+    for (let i = 0; i < eaDefs.length; i++) {
+        const def = eaDefs[i];
+        if (def.parentNode.nodeName === 'ExtendedAttributes') {
+            const fid = textContent(def, 'FieldID'); const alias = textContent(def, 'Alias') || textContent(def, 'FieldName');
+            if(fid && alias) state.customFieldDefs[fid] = alias;
+        }
+    }
+    var tasks = [], resources = {};
+    const resNodes = doc.getElementsByTagName('Resource');
+    for (let i=0; i<resNodes.length; i++) { const r = resNodes[i]; const uid = textContent(r, 'UID'); if(uid) resources[uid] = { email: textContent(r, 'EmailAddress') }; }
+    const manuallyHandledFields = new Set(['UID','Name','OutlineLevel','OutlineNumber','Start','Finish','Notes','Summary','Milestone','PercentComplete','ExtendedAttribute','PredecessorLink']);
+    const taskNodes = doc.getElementsByTagName('Task');
+    for (let i=0; i<taskNodes.length; i++) {
+       const t = taskNodes[i]; const uid = textContent(t, 'UID'); if(!uid || uid==='0') continue;
+       var obj = { uid: uid, name: textContent(t, 'Name') || 'Sin Nombre', outlineLevel: parseInt(textContent(t, 'OutlineLevel')||'1'), outlineNumber: textContent(t, 'OutlineNumber'), start: textContent(t, 'Start'), finish: textContent(t, 'Finish'), notes: textContent(t, 'Notes'), percentReal: parseInt(textContent(t, 'PercentComplete')||'0'), isMilestone: textContent(t, 'Milestone') === '1', resourceUids: [], extendedAttributes: {} };
+       for (const childNode of t.children) { const tagName = childNode.nodeName; if (!manuallyHandledFields.has(tagName)) { const key = tagName.charAt(0).toLowerCase() + tagName.slice(1); obj[key] = (childNode.textContent || '').trim(); } }
+       for (const child of t.children) { if (child.nodeName === 'ExtendedAttribute') { const fid = textContent(child, 'FieldID'); const val = textContent(child, 'Value'); if (fid) obj.extendedAttributes[fid] = val; } }
+       tasks.push(obj);
+    }
+    const assignNodes = doc.getElementsByTagName('Assignment');
+    for(let i=0; i<assignNodes.length; i++) { const a = assignNodes[i]; const tUid = textContent(a, 'TaskUID'); const rUid = textContent(a, 'ResourceUID'); const t = tasks.find(x => x.uid === tUid); if(t && rUid) t.resourceUids.push(rUid); }
+    return { tasks, resources };
+  }
+  function discoverXmlFields(tasks) {
+      availableXmlFields.clear();
+      ['uid','name','start','finish','notes','percentReal'].forEach(f=>availableXmlFields.add(f));
+      tasks.forEach(t => { Object.keys(t).forEach(k => { if(k !== 'extendedAttributes' && k !== 'resourceUids') availableXmlFields.add(k); }); if(t.extendedAttributes) Object.keys(t.extendedAttributes).forEach(k => availableXmlFields.add(`EA:${k}`)); });
+      initCustomFieldMappingUI();
+  }
+
+  // ---------- MAIN RUN LOGIC ----------
+  async function run() {
+      if(!state.parsed) throw new Error("Carga un archivo XML primero.");
+      const mode = safeVal('#mode'); 
+      const dry = $('#dryRun').checked; 
+      let ws = safeVal('#workspaceGid').trim(); 
+      const pname = safeVal('#projectName').trim();
+      let team = safeVal('#teamGid').trim(); 
+
+      if(!ws && state.detectedWs) ws = state.detectedWs;
+      if(!team && state.detectedTeam) team = state.detectedTeam;
+
+      if(!ws) throw new Error("Falta Workspace GID. Pega una URL válida o llena el campo en Configuración.");
+
+      let projectGid = null;
+
+      if (mode === 'create') {
+          if (!pname) throw new Error("Ingresa un nombre para el nuevo proyecto.");
+          if (dry) {
+              logLine(`(Dry) Se crearía proyecto "${pname}" en Workspace ${ws}`, 'ok');
+              projectGid = 'DRY_PROJ';
+          } else {
+              const payload = { name: pname, workspace: ws };
+              if (team && isGid(team)) { payload.team = team; logLine(`Usando Team GID: ${team}`, 'muted'); } 
+              else { logLine('Advertencia: No se detectó Equipo.', 'warn'); }
+              logLine(`Creando proyecto...`, 'muted');
+              const res = await API.createProject(payload);
+              projectGid = res.gid;
+              logLine(`Proyecto creado: ${res.name} (${projectGid})`, 'ok');
+          }
+      } else {
+          if (!state.detectedProj) { const val = safeVal('#asanaUrl').trim(); if(isGid(val)) state.detectedProj = val; else throw new Error("Para Sync, pega la URL del proyecto primero."); }
+          projectGid = state.detectedProj;
+          if(!dry) logLine(`Sincronizando sobre ID: ${projectGid}`, 'ok');
+      }
+
+      const emailToUser = {}; try { (await API.listUsers(ws)).forEach(u => { if(u.email) emailToUser[u.email.toLowerCase()] = u.gid; }); } catch(e){}
+      const mapFields = customFieldMappings.map(m=>m.asanaFieldGid).filter(Boolean); if(isGid(safeVal('#statusFieldGid'))) mapFields.push(safeVal('#statusFieldGid'));
+      if(!dry && mapFields.length) { logLine("Configurando campos...", 'muted'); await Promise.all(mapFields.map(f => http('POST', `https://app.asana.com/api/1.0/projects/${projectGid}/addCustomFieldSetting`, {custom_field:f}).catch(()=>{}))); }
+      
+      let existingByUid = {}; 
+      if (mode === 'sync' && !dry) { existingByUid = await getExistingTasksByUid(projectGid); }
+
+      const items = [...state.tasks].sort((a,b) => a.outlineNumber.localeCompare(b.outlineNumber, undefined, {numeric:true}));
+      
+      const uidToGid = {};
+      const lastGidByLevel = {}; 
+      let creationChain = Promise.resolve();
+
+      logLine(`Procesando ${items.length} tareas secuencialmente...`, 'muted');
+
+      items.forEach(t => {
+          creationChain = creationChain.then(async () => {
+              if(t.uid === '0') return;
+              let level = t.outlineLevel || 1;
+              let baseName = t.name || '';
+              let parentGid = null;
+
+              if (level > 2) { baseName = (t.outlineNumber || '') + ' ' + baseName; parentGid = lastGidByLevel[2] || null; } 
+              else if (level === 2) { baseName = (t.outlineNumber || '') + ' ' + baseName; } 
+              else { baseName = (t.outlineNumber || ' ') + ' ' + baseName.replace(/:+$/,'') + ':'; }
+
+              const assignee = (t.resourceUids[0] && state.resources[t.resourceUids[0]]?.email) ? emailToUser[state.resources[t.resourceUids[0]].email.toLowerCase()] : null;
+              
+              const payload = {
+                  name: baseName,
+                  notes: ensureUidMarker(t.notes, t.uid),
+                  completed: t.percentReal >= 100,
+                  assignee: assignee,
+                  custom_fields: buildAdvancedCFPayloadFor(t)?.custom_fields || {}
+              };
+
+              const sGid = getStatusGid(t);
+              if (sGid && isGid(safeVal('#statusFieldGid'))) payload.custom_fields[safeVal('#statusFieldGid')] = sGid;
+
+              if (level !== 1) { 
+                  if (t.finish) payload.due_on = yyyy_mm_dd(t.finish);
+                  if (t.start && !$('#skipStart').checked && !t.isMilestone) payload.start_on = yyyy_mm_dd(t.start);
+                  if (t.isMilestone && !$('#skipMilestone').checked) payload.resource_subtype = 'milestone';
+              }
+
+              if (dry) {
+                  const dryGid = 'DRY_' + t.uid;
+                  uidToGid[t.uid] = dryGid;
+                  if(level <= 2) lastGidByLevel[level] = dryGid;
+                  logLine(`(dry) ${t.uid} - ${baseName}`);
+                  return;
+              }
+
+              let activeGid = null;
+              const existing = existingByUid[t.uid];
+              
+              if (mode === 'sync' && existing) {
+                  if (computeTaskHash(payload) !== existing.hash) {
+                      await API.updateTask(existing.gid, payload);
+                      logLine(`Actualizado: ${baseName}`, 'ok');
+                  }
+                  activeGid = existing.gid;
+              } else {
+                  if (parentGid) { const res = await API.createSubtaskFlexible(parentGid, payload); activeGid = res.gid; } 
+                  else { const res = await API.createTask({...payload, projects:[projectGid]}); activeGid = res.gid; }
+                  logLine(`Creado: ${baseName}`, 'ok');
+              }
+              uidToGid[t.uid] = activeGid;
+              if(level <= 2) lastGidByLevel[level] = activeGid;
+              if(level === 1) delete lastGidByLevel[2]; 
+          });
+      });
+
+      await creationChain;
+
+      // --- HEADER UPDATE FIX (NO HEADERS ALLOWED) ---
+      if (!dry && projectGid) {
+          logLine("Actualizando cabecera del proyecto...", "muted");
+          try {
+             const rawTime = new Date().toLocaleString();
+             const safeTime = escapeHtml(rawTime);
+             // Replaced <h1> with <strong> to respect Asana's surface restrictions
+             const htmlBody = `<body><strong>Estado de Carga</strong><ul><li><strong>Ultima Actualizacion:</strong> ${safeTime}</li><li><strong>Tareas Procesadas:</strong> ${items.length}</li></ul></body>`;
+             
+             await API.updateProject(projectGid, {
+                 html_notes: htmlBody
+             });
+             logLine("Cabecera del proyecto actualizada.", "ok");
+          } catch(e) {
+             logLine("Error actualizando cabecera: " + e.message, "warn");
+          }
+      }
+      // ---------------------------------------------
+
+      logLine("Proceso Finalizado.", "ok");
+  }
+
+  function yyyy_mm_dd(iso){ if(!iso) return null; try { return new Date(iso).toISOString().split('T')[0]; } catch(e){return null;} }
+  function ensureUidMarker(notes, uid){ var marker = '[MSP_UID: '+uid+']'; return (notes||'').includes('MSP_UID:') ? notes.replace(/\[MSP_UID:\s*[^\]]+\]/, marker) : ((notes||'')+'\n\n'+marker).trim(); }
+  function computeTaskHash(d) { return JSON.stringify({ n: d.name, no: (d.notes||'').replace(/\[MSP_UID:\s*[^\]]+\]/,'').trim(), d: d.due_on, s: $('#skipStart').checked?null:d.start_on, a: d.assignee, c: d.completed, cf: d.custom_fields }); }
+  async function getExistingTasksByUid(projectGid) { logLine('Indexando tareas existentes...', 'muted'); const existingByUid = {}; async function recurse(tasks) { if(!tasks) return; for(let t of tasks) { const m = /\[MSP_UID:\s*([^\]]+)\]/.exec(t.notes||''); if(m) { const cf = {}; (t.custom_fields||[]).forEach(c => cf[c.gid] = c.display_value); const payload = { name: t.name, notes: t.notes, due_on: t.due_on, start_on: t.start_on, assignee: t.assignee?.gid, completed: t.completed, custom_fields: cf }; existingByUid[m[1].trim()] = { gid: t.gid, hash: computeTaskHash(payload) }; } await recurse(await API.listSubtasks(t.gid).catch(()=>[])); } } await recurse(await API.listProjectTasks(projectGid)); return existingByUid; }
+  function getStatusGid(t){ if(!statusFieldOptions) return null; if(t.percentReal >= 100) return statusFieldOptions['finalizada']; if(t.percentReal > 0) return statusFieldOptions['en curso']; return statusFieldOptions['no iniciada']; }
+  
+  function buildAdvancedCFPayloadFor(t){ 
+      const cf = {}; 
+      customFieldMappings.forEach(m => { 
+          if(m.xmlField && m.asanaFieldGid) { 
+              let val; 
+              if (m.xmlField === 'percentReal') { val = t.percentReal; } 
+              else if (m.xmlField.startsWith('EA:')) { const fieldId = m.xmlField.split(':')[1]; val = t.extendedAttributes ? t.extendedAttributes[fieldId] : undefined; if (val && typeof val === 'string' && val.trim().endsWith('%')) { val = val.replace('%', '').trim(); } } 
+              else { val = t[m.xmlField]; } 
+              
+              if(val !== undefined) {
+                  const asanaField = availableAsanaFields.find(f => f.gid === m.asanaFieldGid);
+                  if (asanaField) {
+                      const name = asanaField.name.toLowerCase();
+                      const isPercentField = name.includes('%') || name.includes('percent') || name.includes('porcentaje') || name.includes('avance');
+                      if (isPercentField && !isNaN(val) && parseFloat(val) > 1) { val = parseFloat(val) / 100.0; }
+                  }
+                  cf[m.asanaFieldGid] = val; 
+              }
+          } 
+      }); 
+      return Object.keys(cf).length ? {custom_fields:cf} : null; 
+  }
+
+  // UI LISTENERS
+  if($('#xmlFile')) { $('#xmlFile').onchange = function(e){ if(e.target.files[0]) parseXML(e.target.files[0]).then(doc => { var pr = parseProjectXML(doc); state.xmlDoc=doc; state.tasks=pr.tasks; state.resources=pr.resources; state.parsed=true; discoverXmlFields(pr.tasks); $('#summary').textContent = '✔ ' + pr.tasks.length + ' tareas listas'; $('#summary').className = 'mt-3 inline-flex items-center px-3 py-1 rounded-md text-xs font-bold bg-green-100 text-green-800 border border-green-200'; $('#previewSyncBtn').disabled = false; }); }; }
+  if($('#runBtn')) $('#runBtn').onclick = () => run().catch(e => logLine(e.message, 'error'));
+  if($('#testConn')) $('#testConn').onclick = () => { const st = $('#connStatus'); st.textContent='Probando conexión...'; st.className = 'text-center text-xs font-bold mt-2 text-amber-500'; API.listWorkspaces().then(ws => { st.textContent='¡Conexión Exitosa!'; st.className = 'text-center text-xs font-bold mt-2 text-green-600'; logLine('Workspaces: '+ws.length,'ok'); }).catch(e => { st.textContent='Error de conexión'; st.className = 'text-center text-xs font-bold mt-2 text-red-600'; logLine('Error API: '+e.message,'error'); }); };
+  
+  if($('#mode')) $('#mode').onchange = function() { 
+      const isCreate = this.value === 'create';
+      $('#projectNameContainer').style.display = isCreate ? 'block' : 'none';
+      $('#syncTargetContainer').style.display = isCreate ? 'none' : 'block';
+  };
+
+  const drawerPanel = $('#drawerPanel');
+  function openDrawer(){ $('#drawer').classList.remove('hidden'); setTimeout(()=>drawerPanel.classList.remove('translate-x-full'), 10); }
+  function closeDrawer(){ drawerPanel.classList.add('translate-x-full'); setTimeout(()=>$('#drawer').classList.add('hidden'), 300); }
+  if($('#openDrawer')) $('#openDrawer').onclick = openDrawer;
+  if($('#closeDrawer')) $('#closeDrawer').onclick = closeDrawer;
+  if($('#closeDrawerBtn')) $('#closeDrawerBtn').onclick = closeDrawer;
+  if($('#toggleToken')) $('#toggleToken').onclick = () => { var i=$('#token'); i.type = i.type==='password'?'text':'password'; };
+  if($('#clearLog')) $('#clearLog').onclick = () => { logEl.innerHTML = ''; }; 
+  if($('#btnExportConfig')) $('#btnExportConfig').onclick = exportConfig;
+  if($('#btnImportConfig')) $('#btnImportConfig').onclick = () => $('#configFileInput').click();
+  if($('#configFileInput')) $('#configFileInput').onchange = importConfig;
+  if($('#listWorkspaces')) $('#listWorkspaces').onclick = () => { API.listWorkspaces().then(ws => { $('#wsList').innerHTML = ws.map(w => `<div class="flex items-center justify-between bg-white p-3 rounded-lg border border-gray-200 hover:border-asana-coral transition-colors shadow-sm mb-2"><div class="flex flex-col"><span class="text-sm font-bold text-asana-ink">${w.name}</span><span class="text-[10px] text-gray-400 font-mono">${w.gid}</span></div><button class="text-xs bg-gray-50 hover:bg-asana-coral hover:text-white text-gray-600 px-3 py-1.5 rounded-md font-semibold transition-colors" onclick="$('#workspaceGid').value='${w.gid}'">Usar</button></div>`).join(''); }); };
+  
+  // SAVE BUTTON WITH FIELD CACHING
+  if($('#saveConfigBtn')) $('#saveConfigBtn').onclick=()=>{ 
+      LS.save({ 
+          token: safeVal('#token'), 
+          workspaceGid: safeVal('#workspaceGid'), 
+          teamGid: safeVal('#teamGid'), 
+          statusFieldGid: safeVal('#statusFieldGid'), 
+          customFieldMappings: customFieldMappings, 
+          asanaUrl: safeVal('#asanaUrl'), 
+          skipDeps: $('#skipDeps').checked, 
+          skipStart: $('#skipStart').checked, 
+          skipMilestone: $('#skipMilestone').checked, 
+          deleteObsolete: $('#deleteObsolete').checked,
+          // Guardar campos cacheados
+          cachedAsanaFields: availableAsanaFields 
+      }); 
+      const originalText = $('#saveConfigBtn').innerText; 
+      $('#saveConfigBtn').innerText='¡Configuración Guardada!'; 
+      setTimeout(()=>$('#saveConfigBtn').innerText=originalText, 1500); 
+  };
+  document.querySelectorAll('.tab-btn').forEach(btn => { btn.onclick = () => { document.querySelectorAll('.tab-btn').forEach(b => { b.classList.remove('active', 'border-asana-coral', 'text-asana-coral'); b.classList.add('border-transparent', 'text-gray-500'); }); document.querySelectorAll('.tab-pane').forEach(p => p.classList.add('hidden')); btn.classList.add('active', 'border-asana-coral', 'text-asana-coral'); btn.classList.remove('border-transparent', 'text-gray-500'); if($('#tab-'+btn.dataset.tab)) $('#tab-'+btn.dataset.tab).classList.remove('hidden'); }; });
+
+  // Init Safe
+  (function(){ 
+      var s = LS.load(); 
+      if(s.token && $('#token')) $('#token').value = s.token; 
+      if(s.workspaceGid && $('#workspaceGid')) $('#workspaceGid').value = s.workspaceGid; 
+      if(s.teamGid && $('#teamGid')) $('#teamGid').value = s.teamGid; 
+      if(s.statusFieldGid && $('#statusFieldGid')) $('#statusFieldGid').value = s.statusFieldGid; 
+      if(s.skipDeps !== undefined && $('#skipDeps')) $('#skipDeps').checked = s.skipDeps;
+      if(s.skipStart !== undefined && $('#skipStart')) $('#skipStart').checked = s.skipStart;
+      if(s.skipMilestone !== undefined && $('#skipMilestone')) $('#skipMilestone').checked = s.skipMilestone;
+      if(s.deleteObsolete !== undefined && $('#deleteObsolete')) $('#deleteObsolete').checked = s.deleteObsolete;
+      
+      // RESTORE CACHED FIELDS
+      if(s.cachedAsanaFields && Array.isArray(s.cachedAsanaFields)) {
+          availableAsanaFields = s.cachedAsanaFields;
+      }
+
+      if(s.asanaUrl && $('#asanaUrl')) { $('#asanaUrl').value = s.asanaUrl; setTimeout(() => $('#asanaUrl').dispatchEvent(new Event('input')), 100); }
+      customFieldMappings = s.customFieldMappings || []; 
+      initCustomFieldMappingUI(); 
+      if($('#mode')) $('#mode').dispatchEvent(new Event('change')); 
+  })();
+  </script>
+</body>
+</html>

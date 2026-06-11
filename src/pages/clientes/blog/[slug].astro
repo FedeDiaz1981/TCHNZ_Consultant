@@ -1,0 +1,381 @@
+---
+import PortalLayout from "../../../layouts/PortalLayout.astro";
+import {
+  getCustomerIntlLocale,
+  getCustomerLocale,
+  getCustomerUi
+} from "../../../lib/i18n/customers";
+import {
+  getCurrentPortalClient,
+  getPortalBlogPostBySlug
+} from "../../../lib/portal/client-access";
+import { getSectionHrefForPath } from "../../../lib/portal/hosts";
+import {
+  getModuleContentSection,
+  moduleRequiresAuth
+} from "../../../lib/portal/modules";
+
+const user = Astro.locals.user;
+const supabase = Astro.locals.supabase;
+const portalModule = Astro.locals.portalModule;
+
+if (!supabase) {
+  return Astro.redirect("/consultant/login");
+}
+
+const slug = Astro.params.slug ?? "";
+const locale = getCustomerLocale(Astro.url, Astro.cookies);
+const ui = getCustomerUi(locale).blogDetail;
+const requiresAuth = moduleRequiresAuth(portalModule);
+const contentSection = getModuleContentSection(portalModule) ?? "blog";
+const currentClient =
+  requiresAuth && user ? await getCurrentPortalClient(supabase, user.id, portalModule) : null;
+const post = slug ? await getPortalBlogPostBySlug(supabase, portalModule, slug, contentSection) : null;
+const blogListHref = getSectionHrefForPath(Astro.url, "/clientes/blog");
+
+if (!post) {
+  return Astro.redirect("/consultant/training");
+}
+
+function formatDateLabel(value: string | null) {
+  const source = value ?? post.createdAt;
+
+  return new Intl.DateTimeFormat(getCustomerIntlLocale(locale), {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(source));
+}
+
+function stripHtml(value: string) {
+  return value
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const safeSummary = post.summary ? stripHtml(post.summary) : "";
+---
+
+<PortalLayout
+  title={`${post.title} | ${ui.titleSuffix}`}
+  description={safeSummary || ui.descriptionFallback}
+  userEmail={user?.email ?? ""}
+  activePath="/clientes/blog"
+  clientName={currentClient?.name ?? ""}
+  clientLogoUrl={currentClient?.logoUrl ?? ""}
+  locale={locale}
+  portalModule={portalModule}
+>
+  <section class="portal-panel rounded-[32px] p-6 md:p-8">
+    <div class="portal-blog-article__topbar">
+      <a href={blogListHref} class="portal-action-link">
+        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+        {ui.backToBlog}
+      </a>
+    </div>
+
+    <article class="portal-blog-article mt-6">
+      {post.coverImageUrl ? (
+        <div class="portal-blog-article__cover">
+          <img src={post.coverImageUrl} alt={post.title} />
+        </div>
+      ) : null}
+
+      <header class="portal-blog-article__header">
+        <p class="portal-eyebrow">{ui.eyebrow}</p>
+        <h1>{post.title}</h1>
+        <div class="portal-blog-article__meta">
+          <span>{formatDateLabel(post.publishedAt)}</span>
+          <span class="portal-blog-article__dot"></span>
+          <span>{post.authorName}</span>
+          {post.isFeatured && (
+            <>
+              <span class="portal-blog-article__dot"></span>
+              <span>{ui.featured}</span>
+            </>
+          )}
+        </div>
+        {safeSummary && <p class="portal-blog-article__summary">{safeSummary}</p>}
+      </header>
+
+      <div class="portal-blog-article__tags">
+        {post.tags.map((tag) => (
+          <span class="portal-tag">{tag}</span>
+        ))}
+      </div>
+
+      <div class="portal-blog-article__content">
+        <div class="portal-rich-content" set:html={post.content}></div>
+      </div>
+
+      {post.referenceLinks.length > 0 && (
+        <section class="portal-blog-article__references">
+          <h3>Links de referencia</h3>
+          <ul>
+            {post.referenceLinks.map((referenceLink) => (
+              <li><a href={referenceLink} target="_blank" rel="noopener noreferrer">{referenceLink}</a></li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </article>
+  </section>
+
+  <p class="mt-8 text-center text-xs font-medium tracking-[0.18em] text-white/45">
+    {ui.footer}
+  </p>
+
+  <style>
+    .portal-blog-article {
+      display: grid;
+      gap: 1.5rem;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
+    }
+
+    .portal-blog-article__topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .portal-blog-article__cover {
+      overflow: hidden;
+      border-radius: 2rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      max-height: 460px;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    .portal-blog-article__cover img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .portal-blog-article__header {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .portal-blog-article__header h1 {
+      margin: 0;
+      font-size: clamp(2.3rem, 5vw, 4.6rem);
+      line-height: 0.98;
+      color: #fff;
+      max-width: 14ch;
+    }
+
+    .portal-blog-article__meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.55rem;
+      font-size: 0.84rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.6);
+    }
+
+    .portal-blog-article__dot {
+      width: 0.32rem;
+      height: 0.32rem;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .portal-blog-article__summary {
+      max-width: 62rem;
+      margin: 0;
+      font-size: 1.1rem;
+      line-height: 1.8;
+      color: rgba(255, 255, 255, 0.76);
+    }
+
+    .portal-blog-article__tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+    }
+
+    .portal-blog-article__content {
+      width: 100%;
+      max-width: 100%;
+      padding: 1.6rem;
+      border-radius: 2rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      color: rgba(255, 255, 255, 0.88);
+      font-size: 1rem;
+      line-height: 1.9;
+      overflow: visible;
+      box-sizing: border-box;
+      min-width: 0;
+    }
+
+    .portal-blog-article__content :global(p) {
+      margin: 0 0 0.9rem;
+    }
+
+    .portal-blog-article__content :global(ul),
+    .portal-blog-article__content :global(ol) {
+      margin: 0 0 0.9rem;
+      padding-left: 1.25rem;
+    }
+
+    .portal-blog-article__content :global(img) {
+      max-width: 100%;
+      height: auto;
+      border-radius: 0.8rem;
+      display: block;
+      margin: 1rem 0;
+    }
+
+    .portal-blog-article__content :global(.portal-rich-content) {
+      position: relative;
+      min-height: 460px;
+      padding-bottom: 1.25rem;
+    }
+
+    .portal-blog-article__content :global(.editor-image) {
+      display: block;
+      width: fit-content;
+      max-width: 100%;
+      margin: 0.9rem auto;
+      clear: both;
+    }
+
+    .portal-blog-article__content :global(.editor-image img) {
+      margin: 0;
+    }
+
+    .portal-blog-article__content :global(.editor-image.is-left) {
+      float: left;
+      margin: 0.8rem 1rem 0.8rem 0;
+      clear: none;
+    }
+
+    .portal-blog-article__content :global(.editor-image.is-right) {
+      float: right;
+      margin: 0.8rem 0 0.8rem 1rem;
+      clear: none;
+    }
+
+    .portal-blog-article__content :global(.editor-image.is-center) {
+      float: none;
+      margin: 0.9rem auto;
+      clear: both;
+    }
+
+    .portal-blog-article__content :global(.editor-image.is-free) {
+      float: none;
+      clear: both;
+      margin-top: 0.9rem;
+      margin-bottom: 0.9rem;
+      margin-right: 0;
+      margin-left: 0;
+    }
+
+    .portal-blog-article__content :global(.editor-layout-block) {
+      position: absolute;
+      border: 0;
+      border-radius: 0.75rem;
+      background: transparent;
+      box-shadow: none;
+      padding: 0.55rem;
+      min-width: 90px;
+      min-height: 48px;
+      z-index: 2;
+    }
+
+    .portal-blog-article__content :global(.editor-layout-block__text) {
+      min-height: 100%;
+      color: inherit;
+    }
+
+    .portal-blog-article__content :global(.editor-layout-block__resize) {
+      display: none;
+    }
+
+    .portal-blog-article__content :global(.portal-rich-content *) {
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    .portal-blog-article__content :global(span) {
+      background: transparent !important;
+      color: inherit !important;
+    }
+
+    .portal-blog-article__references {
+      width: 100%;
+      max-width: 100%;
+      padding: 1.2rem 1.5rem;
+      border-radius: 1.4rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+      box-sizing: border-box;
+      min-width: 0;
+    }
+
+    .portal-blog-article__references h3 {
+      margin: 0 0 0.75rem;
+      font-size: 1rem;
+      color: #fff;
+    }
+
+    .portal-blog-article__references ul {
+      margin: 0;
+      padding-left: 1.1rem;
+      min-width: 0;
+    }
+
+    .portal-blog-article__references a {
+      color: #ffb979;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+  </style>
+
+  <script is:inline>
+    (() => {
+      const contentRoots = document.querySelectorAll(".portal-rich-content");
+      if (contentRoots.length === 0) return;
+
+      const applyRichContentHeight = () => {
+        contentRoots.forEach((rootNode) => {
+          if (!(rootNode instanceof HTMLElement)) return;
+
+          // Reset to natural flow first, then expand to include absolutely-positioned blocks.
+          rootNode.style.height = "auto";
+
+          let maxBottom = 0;
+          rootNode.querySelectorAll(".editor-layout-block").forEach((blockNode) => {
+            if (!(blockNode instanceof HTMLElement)) return;
+            const top = blockNode.offsetTop;
+            const bottom = top + blockNode.offsetHeight;
+            if (bottom > maxBottom) maxBottom = bottom;
+          });
+
+          const naturalHeight = rootNode.scrollHeight;
+          const finalHeight = Math.max(naturalHeight, maxBottom + 24, 460);
+          rootNode.style.minHeight = `${finalHeight}px`;
+        });
+      };
+
+      applyRichContentHeight();
+      window.addEventListener("load", applyRichContentHeight);
+      window.addEventListener("resize", applyRichContentHeight);
+    })();
+  </script>
+</PortalLayout>

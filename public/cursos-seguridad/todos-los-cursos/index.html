@@ -1,0 +1,169 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cursos sobre Seguridad de la Información - Technized</title>
+    <style>
+        :root {
+            --dark-bg: #0a192f;
+            --light-slate: #ccd6f6;
+            --slate: #8892b0;
+            --accent: #fbbf24;
+            --card-border: rgba(136, 146, 176, 0.2);
+        }
+        html { scroll-behavior: smooth; }
+        body {
+            background-color: var(--dark-bg);
+            color: var(--light-slate);
+            font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        .main-header {
+            padding: 2rem 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .logo-row {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        .logo-tech {
+            height: 5.2rem;
+            width: auto;
+        }
+        .hero-section {
+            text-align: center;
+            padding: 3rem 0 2rem;
+        }
+        .hero-section h1 {
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: 2.8rem;
+            color: white;
+            margin-bottom: 0.5rem;
+        }
+        .hero-section p {
+            font-size: 1.1rem;
+            color: var(--slate);
+            max-width: 650px;
+            margin: 0 auto;
+        }
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+            gap: 2rem;
+            padding-bottom: 4rem;
+        }
+        .course-card {
+            background-color: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: center;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+        .course-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--accent);
+        }
+        .course-card h3 {
+            font-size: 1.1rem;
+            margin-bottom: 0.75rem;
+            color: var(--light-slate);
+        }
+        .course-duration {
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: var(--accent);
+            margin-bottom: 1rem;
+        }
+        .course-btn {
+            display: inline-block;
+            padding: 0.75rem 1.25rem;
+            background-color: var(--accent);
+            color: #0a192f;
+            font-weight: 600;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: background 0.2s ease-in-out;
+        }
+        .course-btn:hover {
+            background-color: #d8a501;
+        }
+        .main-footer {
+            text-align: center;
+            padding: 2rem 0;
+            border-top: 1px solid var(--card-border);
+            color: var(--slate);
+            font-size: 0.9rem;
+            margin-top: auto;
+        }
+    </style>
+    <link rel="stylesheet" href="../consultant-theme.css"></head>
+<body>
+    <header class="main-header container">
+        <div class="logo-row">
+            <img src="/consultant/assets/brand/logo-technized-text-white.png" alt="Technized" class="logo-tech">
+        </div>
+    </header>
+
+    <main class="container" style="flex: 1 0 auto;">
+        <section class="hero-section">
+            <h1>Cursos sobre Seguridad de la Información</h1>
+            <p>Capacitaciones esenciales para fortalecer la cultura de seguridad y proteger los activos digitales.</p>
+        </section>
+        <section>
+            <div class="card-grid">
+
+                <div class="course-card">
+                    <h3>Proceso de reporte de incidentes de seguridad</h3>
+                    <p class="course-duration">6 minutos</p>
+                    <a href="../reporte-incidente/index.html" class="course-btn">Ir al Curso</a>
+                </div>
+
+                <div class="course-card">
+                    <h3>Manual de Seguridad de la información para consultores</h3>
+                    <p class="course-duration">7 minutos</p>
+                    <a href="../info-seguridad/index.html" class="course-btn">Ir al Curso</a>
+                </div>
+
+                <div class="course-card">
+                    <h3>Manejo e Intercambio de Información para Consultores</h3>
+                    <p class="course-duration">7 minutos</p>
+                    <a href="../intercambio-informacion/index.html" class="course-btn">Ir al Curso</a>
+                </div>
+
+                <div class="course-card">
+                    <h3>Manual de conducta del colaborador</h3>
+                    <p class="course-duration">7 minutos</p>
+                    <a href="../conducta-consultor/index.html" class="course-btn">Ir al Curso</a>
+                </div>
+
+                <div class="course-card">
+                    <h3>Instructivo para el Uso y Cuidado de Dispositivos Corporativos</h3>
+                    <p class="course-duration">6 minutos</p>
+                    <a href="../uso-cuidado-dispositivos/index.html" class="course-btn">Ir al Curso</a>
+                </div>
+
+            </div>
+        </section>
+    </main>
+    <footer class="main-footer">
+        <p>&copy; 2026 Technized. Todos los derechos reservados.</p>
+    </footer>
+</body>
+</html>
+
+

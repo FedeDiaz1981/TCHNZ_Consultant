@@ -1,0 +1,148 @@
+---
+import AuthShell from "../../components/portal/AuthShell.astro";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getCustomerLocale, getCustomerUi } from "../../lib/i18n/customers";
+import { withPortalBasePath } from "../../lib/portal/base-path";
+import { supabaseAnonKey, supabaseUrl } from "../../lib/supabase/env";
+
+function getSafeNextPath(candidate: string | null) {
+  if (!candidate || !candidate.startsWith("/") || candidate.startsWith("//")) {
+    return withPortalBasePath("/reset-password");
+  }
+
+  return withPortalBasePath(candidate);
+}
+
+const nextPath = getSafeNextPath(Astro.url.searchParams.get("next"));
+const forgotPasswordPath = withPortalBasePath("/forgot-password");
+const resetPasswordPath = withPortalBasePath("/reset-password");
+const locale = getCustomerLocale(Astro.url, Astro.cookies);
+const ui = getCustomerUi(locale).authRecovery;
+---
+
+<BaseLayout title={ui.title} description={ui.description} lang={locale}>
+  <AuthShell
+    eyebrow={ui.eyebrow}
+    heading={ui.heading}
+    copy={ui.copy}
+    locale={locale}
+    footerCopy={getCustomerUi(locale).authShell.footer}
+  >
+    <div
+      class="space-y-4"
+      data-auth-recovery
+      data-supabase-url={supabaseUrl}
+      data-supabase-anon-key={supabaseAnonKey}
+      data-next-path={nextPath}
+      data-forgot-password-path={forgotPasswordPath}
+      data-reset-password-path={resetPasswordPath}
+      data-init-error={ui.initError}
+      data-invalid-link={ui.invalidLink}
+      data-ready-message={ui.readyMessage}
+      data-verify-error={ui.verifyError}
+    >
+      <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-5 text-sm text-white/75">
+        {ui.waiting}
+      </div>
+      <div class="h-2 overflow-hidden rounded-full bg-white/10">
+        <div class="auth-recovery-progress h-full w-1/3 rounded-full"></div>
+      </div>
+    </div>
+  </AuthShell>
+
+  <script>
+    import { createBrowserClient } from "@supabase/ssr";
+
+    const recoveryNode = document.querySelector("[data-auth-recovery]");
+    const supabaseUrl = recoveryNode?.dataset.supabaseUrl;
+    const supabaseAnonKey = recoveryNode?.dataset.supabaseAnonKey;
+    const resetPasswordPath = recoveryNode?.dataset.resetPasswordPath ?? "/reset-password";
+    const forgotPasswordPath = recoveryNode?.dataset.forgotPasswordPath ?? "/forgot-password";
+    const nextPath = recoveryNode?.dataset.nextPath ?? resetPasswordPath;
+    const initError = recoveryNode?.dataset.initError ?? "We could not start link validation. Request a new one.";
+    const invalidLink = recoveryNode?.dataset.invalidLink ?? "The recovery link is invalid or has expired.";
+    const readyMessage = recoveryNode?.dataset.readyMessage ?? "You can now set a new password.";
+    const verifyError = recoveryNode?.dataset.verifyError ?? "We could not validate the recovery link. Request a new one.";
+
+    const redirectWithMessage = (pathname, key, value) => {
+      const url = new URL(pathname, window.location.origin);
+      url.searchParams.set(key, value);
+      window.location.replace(url.toString());
+    };
+
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const queryParams = new URLSearchParams(window.location.search);
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      redirectWithMessage(
+        forgotPasswordPath,
+        "error",
+        initError
+      );
+    }
+
+    const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        detectSessionInUrl: false
+      }
+    });
+
+    const run = async () => {
+      try {
+        const code = queryParams.get("code");
+
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) throw error;
+        } else {
+          const accessToken = hashParams.get("access_token");
+          const refreshToken = hashParams.get("refresh_token");
+
+          if (!accessToken || !refreshToken) {
+            redirectWithMessage(
+              forgotPasswordPath,
+              "error",
+              invalidLink
+            );
+            return;
+          }
+
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          });
+
+          if (error) throw error;
+        }
+
+        redirectWithMessage(nextPath, "message", readyMessage);
+      } catch (error) {
+        console.error("No pudimos validar el enlace de recovery.", error);
+        redirectWithMessage(
+          forgotPasswordPath,
+          "error",
+          verifyError
+        );
+      }
+    };
+
+    run();
+  </script>
+
+  <style>
+    .auth-recovery-progress {
+      background: linear-gradient(135deg, #ef7c0e 0%, #d56500 100%);
+      animation: auth-recovery-progress 1.6s ease-in-out infinite;
+      box-shadow: 0 0 20px rgba(239, 124, 14, 0.32);
+    }
+
+    @keyframes auth-recovery-progress {
+      0% {
+        transform: translateX(-110%);
+      }
+      100% {
+        transform: translateX(320%);
+      }
+    }
+  </style>
+</BaseLayout>

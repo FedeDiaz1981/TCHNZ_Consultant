@@ -1,0 +1,54 @@
+:root {
+  --consultant-bg-1: #09070d;
+  --consultant-bg-2: #140d1d;
+  --consultant-panel: rgba(24, 16, 30, 0.82);
+  --consultant-border: rgba(255, 255, 255, 0.1);
+  --consultant-text: #f4f1f8;
+  --consultant-muted: #b8afc5;
+  --consultant-accent: #ef7c0e;
+}
+
+html,
+body {
+  background:
+    radial-gradient(60% 80% at 50% 18%, rgba(118, 54, 140, 0.22), transparent 55%),
+    radial-gradient(35% 30% at 50% 48%, rgba(239, 124, 14, 0.1), transparent 60%),
+    linear-gradient(180deg, var(--consultant-bg-2) 0%, var(--consultant-bg-1) 100%) !important;
+  color: var(--consultant-text) !important;
+}
+
+.card,
+.course-card {
+  background: var(--consultant-panel) !important;
+  border: 1px solid var(--consultant-border) !important;
+  border-radius: 16px !important;
+}
+
+.course-card h3,
+h1,
+h2,
+h3 {
+  color: var(--consultant-text) !important;
+}
+
+p,
+.course-duration,
+.main-footer,
+.text-slate-300,
+.text-slate-400 {
+  color: var(--consultant-muted) !important;
+}
+
+.course-btn,
+.btn-primary,
+button.bg-amber-400 {
+  background: var(--consultant-accent) !important;
+  border-color: var(--consultant-accent) !important;
+  color: #1b1024 !important;
+}
+
+.course-btn:hover,
+.btn-primary:hover,
+button.bg-amber-400:hover {
+  filter: brightness(1.06);
+}

@@ -1,0 +1,1193 @@
+﻿---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import { getAdminClients, getAdminUsers } from "../../lib/portal/admin";
+import { getAdminFlash } from "../../lib/portal/admin-flash";
+import { getPortalModuleConfig } from "../../lib/portal/modules";
+
+const user = Astro.locals.user;
+const supabase = Astro.locals.supabase;
+const portalModule = Astro.locals.portalModule;
+const moduleConfig = getPortalModuleConfig(portalModule);
+
+if (!user || !supabase) {
+  return Astro.redirect("/consultant/login");
+}
+
+const flash = getAdminFlash(Astro.url);
+const [users, clients] = await Promise.all([
+  getAdminUsers(supabase, portalModule),
+  getAdminClients(supabase, portalModule)
+]);
+
+function getDialogId(profileId: string) {
+  return `user-dialog-${profileId}`;
+}
+
+function getPasswordDialogId(profileId: string) {
+  return `user-password-dialog-${profileId}`;
+}
+---
+
+<AdminLayout
+  title={`Usuarios ${moduleConfig.name.es} | Administracion portal`}
+  description={`Gestion de usuarios del modulo ${moduleConfig.name.es}`}
+  userEmail={user.email ?? ""}
+  activePath="/admin/usuarios"
+  portalModule={portalModule}
+>
+  <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+    {flash && (
+      <div
+        class:list={[
+          "mb-6 rounded-3xl border px-4 py-3.5 text-sm sm:px-5 sm:py-4",
+          flash.tone === "error"
+            ? "border-red-400/30 bg-red-500/10 text-red-50"
+            : "border-emerald-400/30 bg-emerald-500/10 text-emerald-50"
+        ]}
+      >
+        {flash.message}
+      </div>
+    )}
+
+    <section class="space-y-6">
+      <div class="portal-panel rounded-[30px] p-5 sm:p-6">
+        <div class="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div class="max-w-3xl">
+            <p class="portal-eyebrow text-[11px]">Base de usuarios</p>
+            <h2 class="mt-2 text-2xl font-semibold text-white sm:text-3xl">Grilla operativa</h2>
+            <p class="portal-copy mt-2 hidden text-sm leading-6 sm:block">
+              Roles, activacion y relacion con consultores desde una sola vista. Cada fila abre el
+              detalle del usuario para editar su configuracion y membresias.
+            </p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="self-start rounded-full border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-white/70 sm:self-auto">
+              {users.length} usuarios
+            </span>
+            <button
+              type="button"
+              class="portal-action-link portal-action-link--solid w-full justify-center sm:w-auto"
+              data-open-dialog="create-user-dialog"
+            >
+              Agregar usuario
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="portal-panel rounded-[30px] p-0">
+        <div class="px-4 pt-4 sm:px-6 sm:pt-5">
+          <div class="admin-users-toolbar">
+            <label class="admin-users-search">
+              <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+              <input
+                type="search"
+                placeholder="Buscar por nombre, email o rol"
+                data-user-search
+              />
+            </label>
+
+            <p class="portal-copy hidden text-xs sm:block sm:text-sm">
+              Click en una fila para abrir el detalle del usuario.
+            </p>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <div class="px-4 pb-4 lg:min-w-[960px] sm:px-6 sm:pb-5">
+            <div class="admin-users-head">
+              <span>Usuario</span>
+              <span>Rol global</span>
+              <span>Membresias</span>
+              <span>Consultor principal</span>
+              <span>Estado</span>
+              <span class="text-right">Accion</span>
+            </div>
+
+            <div class="mt-3 space-y-3">
+              {users.map((profile) => {
+                const dialogId = getDialogId(profile.id);
+                const passwordDialogId = getPasswordDialogId(profile.id);
+                const membershipsCount = profile.memberships.length;
+                const firstMembership = profile.memberships[0];
+                const primaryMembership = firstMembership ?? null;
+                const isAdminProfile = profile.role === "admin";
+                const passwordActionLabel =
+                  profile.passwordStatus === "missing" ? "Crear contrasena" : "Modificar contrasena";
+                const passwordModalTitle =
+                  profile.passwordStatus === "missing" ? "Crear contrasena" : "Modificar contrasena";
+                const searchIndex = `${profile.fullName ?? ""} ${profile.email} ${profile.role} ${
+                  profile.isActive ? "activo" : "inactivo"
+                } ${profile.memberships.map((membership) => membership.clientName).join(" ")}`
+                  .toLowerCase()
+                  .trim();
+
+                return (
+                  <>
+                    <button
+                      type="button"
+                      class="admin-users-row"
+                      data-open-dialog={dialogId}
+                      data-user-row
+                      data-user-search-value={searchIndex}
+                      aria-label={`Abrir detalle de ${profile.email}`}
+                    >
+                      <span class="admin-users-row__identity">
+                        <span class="admin-users-avatar">
+                          {(profile.fullName ?? profile.email).slice(0, 2).toUpperCase()}
+                        </span>
+                        <span class="min-w-0 text-left">
+                          <strong class="block truncate text-sm text-white">
+                            {profile.fullName ?? profile.email}
+                          </strong>
+                          <span class="portal-copy block truncate text-xs">{profile.email}</span>
+                        </span>
+                      </span>
+
+                      <span class="admin-users-row__role">{profile.role}</span>
+                      <span class="admin-users-row__metric">
+                        <span class="admin-users-row__metric-label">Membresias</span>
+                        <strong>{membershipsCount}</strong>
+                      </span>
+                      <span class="admin-users-row__client">
+                        <span class="admin-users-row__metric-label">Consultor principal</span>
+                        {firstMembership ? firstMembership.clientName : "Sin asignar"}
+                      </span>
+                      <span class="admin-users-row__state">
+                        <span
+                          class:list={[
+                            "inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]",
+                            profile.isActive
+                              ? "border border-emerald-400/20 bg-emerald-500/10 text-emerald-100"
+                              : "border border-white/10 bg-white/5 text-white/55"
+                          ]}
+                        >
+                          {profile.isActive ? "Activo" : "Inactivo"}
+                        </span>
+                      </span>
+                      <span class="admin-users-row__action text-right text-xs font-semibold uppercase tracking-[0.18em] text-[#ff8c1a]">
+                        Abrir
+                      </span>
+                    </button>
+
+                    <dialog id={dialogId} data-admin-dialog class="admin-users-dialog">
+                      <div class="admin-users-dialog__panel portal-panel rounded-[32px] p-0">
+                        <div class="admin-users-dialog__header flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4 sm:px-6">
+                          <div>
+                            <p class="portal-eyebrow text-[11px]">Detalle de usuario</p>
+                            <h3 class="mt-2 text-xl font-semibold text-white sm:text-2xl">
+                              {profile.fullName ?? profile.email}
+                            </h3>
+                            <p class="portal-copy mt-1 text-sm">{profile.email}</p>
+                          </div>
+
+                          <button
+                            type="button"
+                            class="rounded-full border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/70 transition hover:border-white/20 hover:text-white"
+                            data-close-dialog
+                          >
+                            Cerrar
+                          </button>
+                        </div>
+
+                        <div class="admin-users-dialog__body overflow-y-auto px-5 py-5 sm:px-6">
+                          <div class="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
+                            <aside class="space-y-4">
+                              <div class="rounded-[28px] border border-white/10 bg-black/20 p-4">
+                                <p class="portal-copy text-xs uppercase tracking-[0.14em]">Resumen</p>
+                                <div class="mt-4 flex items-center gap-3">
+                                  <span class="admin-users-avatar admin-users-avatar--large">
+                                    {(profile.fullName ?? profile.email).slice(0, 2).toUpperCase()}
+                                  </span>
+                                  <div class="min-w-0">
+                                    <strong class="block truncate text-white">
+                                      {profile.fullName ?? "Sin nombre"}
+                                    </strong>
+                                    <p class="portal-copy truncate text-sm">{profile.email}</p>
+                                  </div>
+                                </div>
+
+                                <div class="mt-4 grid grid-cols-2 gap-3">
+                                  <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
+                                    <p class="portal-copy text-[11px] uppercase tracking-[0.14em]">Rol</p>
+                                    <strong class="mt-2 block text-base text-white">{profile.role}</strong>
+                                  </div>
+                                  <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-4">
+                                    <p class="portal-copy text-[11px] uppercase tracking-[0.14em]">Consultores</p>
+                                    <strong class="mt-2 block text-base text-white">{membershipsCount}</strong>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div class="rounded-[28px] border border-white/10 bg-black/20 p-4">
+                                <p class="portal-copy text-xs uppercase tracking-[0.14em]">Membresias actuales</p>
+                                {profile.memberships.length === 0 ? (
+                                  <p class="portal-copy mt-3 text-sm">Sin consultores asociados todavia.</p>
+                                ) : (
+                                  <div class="mt-3 flex flex-wrap gap-2">
+                                    {profile.memberships.map((membership) => (
+                                      <span class="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80">
+                                        {membership.clientName} - {membership.role} - {membership.isActive ? "activo" : "inactivo"}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </aside>
+
+                            <form action="/consultant/api/admin/manage" method="POST" class="space-y-5">
+                              <input type="hidden" name="action" value="save-user-settings" />
+                                <input type="hidden" name="redirect_to" value="/admin/usuarios" />
+                                <input type="hidden" name="profile_id" value={profile.id} />
+
+                              <div class="space-y-5">
+                                <div class="rounded-[28px] border border-white/10 bg-black/20 p-4 sm:p-5">
+                                  <div>
+                                    <p class="portal-copy text-xs uppercase tracking-[0.14em]">Perfil</p>
+                                    <p class="portal-copy mt-1 text-sm">
+                                      Nombre visible, estado de la cuenta y acceso administrativo.
+                                    </p>
+                                  </div>
+
+                                  <div class="mt-4 grid gap-4">
+                                    <label class="block">
+                                      <span class="mb-2 block text-sm font-medium text-white/80">Nombre</span>
+                                      <input
+                                        class="portal-input w-full rounded-2xl px-4 py-3"
+                                        type="text"
+                                        name="full_name"
+                                        value={profile.fullName ?? ""}
+                                        placeholder={profile.email}
+                                      />
+                                    </label>
+
+                                    <div class="block">
+                                      <span class="mb-2 block text-sm font-medium text-white/80">Email</span>
+                                      <div class="portal-input rounded-2xl px-4 py-3 text-white/70">{profile.email}</div>
+                                    </div>
+                                  </div>
+
+                                  <div class="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                                    <div class="block">
+                                      <span class="mb-2 block text-sm font-medium text-white/80">
+                                        Contrasena actual
+                                      </span>
+                                      <div class="portal-input rounded-2xl px-4 py-3 text-white/70">
+                                        {profile.passwordDisplay}
+                                      </div>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      class="portal-action-link portal-action-link--solid justify-center"
+                                      data-open-dialog={passwordDialogId}
+                                    >
+                                      {passwordActionLabel}
+                                    </button>
+                                  </div>
+
+                                  <label class="mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80">
+                                    <input type="hidden" name="is_active" value="false" />
+                                    <input
+                                      type="checkbox"
+                                      name="is_active"
+                                      value="true"
+                                      checked={profile.isActive}
+                                      class="h-4 w-4"
+                                    />
+                                    Usuario activo
+                                  </label>
+
+                                  <label class="mt-4 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80">
+                                    <input type="hidden" name="is_admin" value="false" />
+                                    <input
+                                      type="checkbox"
+                                      name="is_admin"
+                                      value="true"
+                                      checked={isAdminProfile}
+                                      class="h-4 w-4"
+                                      data-admin-checkbox
+                                    />
+                                    Usuario administrador
+                                  </label>
+
+                                  <div class="mt-4 rounded-2xl border border-red-400/20 bg-red-500/8 px-4 py-4">
+                                    <p class="text-sm font-semibold text-red-100">
+                                      Eliminar usuario
+                                    </p>
+                                    <p class="mt-2 text-sm leading-6 text-red-50/80">
+                                      Esta accion quita el usuario de la lista operativa y
+                                      desactiva sus membresias asociadas.
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div
+                                  class:list={[
+                                    "rounded-[28px] border border-white/10 bg-black/20 p-4 sm:p-5"
+                                  ]}
+                                  data-membership-panel
+                                >
+                                  <div>
+                                    <p class="portal-copy text-xs uppercase tracking-[0.14em]">Asignar consultor</p>
+                                    <p class="portal-copy mt-1 text-sm">
+                                      Vincula al usuario con el consultor al que pertenece. Si eliges un consultor,
+                                      la membresia queda guardada aunque el usuario sea administrador.
+                                    </p>
+                                  </div>
+
+                                  <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                                    <label class="block lg:col-span-2">
+                                      <span class="mb-2 block text-sm font-medium text-white/80">Consultor</span>
+                                      <select
+                                        class="portal-input w-full rounded-2xl px-4 py-3"
+                                        name="client_id"
+                                        data-membership-required="true"
+                                      >
+                                        <option value="">Selecciona consultor</option>
+                                        {clients.map((client) => (
+                                          <option value={client.id} selected={primaryMembership?.clientId === client.id}>
+                                            {client.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+
+                                    <label class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80">
+                                      <input type="hidden" name="membership_is_active" value="false" />
+                                      <input
+                                        type="checkbox"
+                                        name="membership_is_active"
+                                        value="true"
+                                        checked={primaryMembership?.isActive ?? true}
+                                        class="h-4 w-4"
+                                      />
+                                      Membresia activa
+                                    </label>
+                                  </div>
+                                </div>
+
+                                <div class="flex flex-wrap items-center justify-between gap-3">
+                                  <button
+                                    type="submit"
+                                    name="intent"
+                                    value="delete-user"
+                                    class="inline-flex items-center justify-center rounded-full border border-red-400/25 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-100 transition hover:border-red-300/40 hover:bg-red-500/16"
+                                    data-confirm-submit="Vas a quitar este usuario de la lista y desactivar sus membresias asociadas. Esta accion no se puede deshacer. ¿Deseas continuar?"
+                                  >
+                                    Eliminar usuario
+                                  </button>
+
+                                  <button type="submit" class="portal-action-link portal-action-link--solid">
+                                    Guardar
+                                  </button>
+                                </div>
+                              </div>
+                            </form>
+                          </div>
+                        </div>
+                      </div>
+                    </dialog>
+
+                    <dialog id={passwordDialogId} data-admin-dialog class="admin-users-dialog admin-users-dialog--compact">
+                      <div class="admin-users-dialog__panel portal-panel rounded-[32px] p-0">
+                        <div class="admin-users-dialog__header flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4 sm:px-6">
+                          <div>
+                            <p class="portal-eyebrow text-[11px]">Credenciales</p>
+                            <h3 class="mt-2 text-xl font-semibold text-white sm:text-2xl">
+                              {passwordModalTitle}
+                            </h3>
+                            <p class="portal-copy mt-1 text-sm">
+                              {profile.email}
+                            </p>
+                          </div>
+
+                          <button
+                            type="button"
+                            class="rounded-full border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/70 transition hover:border-white/20 hover:text-white"
+                            data-close-dialog
+                          >
+                            Cerrar
+                          </button>
+                        </div>
+
+                        <form action="/consultant/api/admin/manage" method="POST" class="flex max-h-[80vh] flex-col">
+                          <input type="hidden" name="action" value="update-user-password" />
+                          <input type="hidden" name="redirect_to" value="/admin/usuarios" />
+                          <input type="hidden" name="profile_id" value={profile.id} />
+
+                          <div class="admin-users-dialog__body overflow-y-auto px-5 py-5 sm:px-6">
+                            <div class="space-y-4 rounded-[28px] border border-white/10 bg-black/20 p-4 sm:p-5">
+                              <div>
+                                <p class="portal-copy text-xs uppercase tracking-[0.14em]">Contrasena</p>
+                                <p class="portal-copy mt-1 text-sm">
+                                  Escribe la nueva contrasena y confirmala para guardar el cambio.
+                                </p>
+                              </div>
+
+                              <label class="block">
+                                <span class="mb-2 block text-sm font-medium text-white/80">
+                                  Contrasena
+                                </span>
+                                <div class="admin-password-field">
+                                  <input
+                                    class="portal-input w-full rounded-2xl px-4 py-3"
+                                    type="password"
+                                    name="password"
+                                    minlength="8"
+                                    required
+                                    data-password-input
+                                  />
+                                  <button
+                                    type="button"
+                                    class="admin-password-toggle"
+                                    data-password-toggle
+                                    aria-label="Mostrar contrasena"
+                                    aria-pressed="false"
+                                  >
+                                    <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                                  </button>
+                                </div>
+                              </label>
+
+                              <label class="block">
+                                <span class="mb-2 block text-sm font-medium text-white/80">
+                                  Confirmar contrasena
+                                </span>
+                                <div class="admin-password-field">
+                                  <input
+                                    class="portal-input w-full rounded-2xl px-4 py-3"
+                                    type="password"
+                                    name="confirm_password"
+                                    minlength="8"
+                                    required
+                                    data-password-input
+                                  />
+                                  <button
+                                    type="button"
+                                    class="admin-password-toggle"
+                                    data-password-toggle
+                                    aria-label="Mostrar contrasena"
+                                    aria-pressed="false"
+                                  >
+                                    <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                                  </button>
+                                </div>
+                              </label>
+                            </div>
+                          </div>
+
+                          <div class="admin-users-dialog__footer flex flex-wrap items-center justify-end gap-3 border-t border-white/10 px-5 py-4 sm:px-6">
+                            <button type="button" class="portal-action-link" data-close-dialog>
+                              Cancelar
+                            </button>
+                            <button type="submit" class="portal-action-link portal-action-link--solid">
+                              Guardar
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    </dialog>
+                  </>
+                );
+              })}
+            </div>
+
+            <div class="portal-empty-state mt-4 hidden rounded-[24px] px-4 py-5 text-sm" data-user-empty>
+              No encontramos usuarios para ese criterio de busqueda.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <dialog
+    id="create-user-dialog"
+    data-admin-dialog
+    data-reset-on-open="true"
+    class="admin-users-dialog admin-users-dialog--compact"
+  >
+    <div class="admin-users-dialog__panel portal-panel rounded-[32px] p-0">
+      <div class="admin-users-dialog__header flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4 sm:px-6">
+        <div>
+          <p class="portal-eyebrow text-[11px]">Alta de usuario</p>
+          <h3 class="mt-2 text-2xl font-semibold text-white">Agregar usuario</h3>
+          <p class="portal-copy mt-1 text-sm">
+            Crea una cuenta nueva y, si corresponde, asociala a un consultor. La membresia se guarda siempre como member.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="rounded-full border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/70 transition hover:border-white/20 hover:text-white"
+          data-close-dialog
+        >
+          Cerrar
+        </button>
+      </div>
+
+      <form action="/consultant/api/admin/manage" method="POST" class="flex max-h-[80vh] flex-col">
+        <input type="hidden" name="action" value="create-user" />
+        <input type="hidden" name="redirect_to" value="/admin/usuarios" />
+
+        <div class="admin-users-dialog__body overflow-y-auto px-5 py-5 sm:px-6">
+          <div class="space-y-4">
+            <div class="space-y-4 rounded-[28px] border border-white/10 bg-black/20 p-4 sm:p-5">
+              <div>
+                <p class="portal-copy text-xs uppercase tracking-[0.14em]">Perfil</p>
+                <p class="portal-copy mt-1 text-sm">
+                  Datos base, estado inicial de la cuenta y acceso administrativo.
+                </p>
+              </div>
+
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-white/80">Nombre</span>
+                <input
+                  class="portal-input w-full rounded-2xl px-4 py-3"
+                  type="text"
+                  name="full_name"
+                  placeholder="Nombre visible del usuario"
+                />
+              </label>
+
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-white/80">Email</span>
+                <input
+                  class="portal-input w-full rounded-2xl px-4 py-3"
+                  type="email"
+                  name="email"
+                  autocomplete="email"
+                  required
+                  placeholder="usuario@empresa.com"
+                />
+              </label>
+
+              <label class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80">
+                <input type="hidden" name="is_active" value="false" />
+                <input type="checkbox" name="is_active" value="true" checked class="h-4 w-4" />
+                Usuario activo
+              </label>
+
+              <label class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80">
+                <input type="hidden" name="is_admin" value="false" />
+                <input
+                  type="checkbox"
+                  name="is_admin"
+                  value="true"
+                  class="h-4 w-4"
+                  data-admin-checkbox
+                />
+                Usuario administrador
+              </label>
+            </div>
+
+            <div class="space-y-4 rounded-[28px] border border-white/10 bg-black/20 p-4 sm:p-5">
+              <div>
+                <p class="portal-copy text-xs uppercase tracking-[0.14em]">Contrasena inicial</p>
+                <p class="portal-copy mt-1 text-sm">
+                  Define la clave con la que el usuario ingresara al portal.
+                </p>
+              </div>
+
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-white/80">Contrasena</span>
+                <div class="admin-password-field">
+                  <input
+                    class="portal-input w-full rounded-2xl px-4 py-3"
+                    type="password"
+                    name="password"
+                    autocomplete="new-password"
+                    minlength="8"
+                    required
+                    data-password-input
+                  />
+                  <button
+                    type="button"
+                    class="admin-password-toggle"
+                    data-password-toggle
+                    aria-label="Mostrar contrasena"
+                    aria-pressed="false"
+                  >
+                    <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                  </button>
+                </div>
+              </label>
+
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-white/80">Confirmar contrasena</span>
+                <div class="admin-password-field">
+                  <input
+                    class="portal-input w-full rounded-2xl px-4 py-3"
+                    type="password"
+                    name="confirm_password"
+                    autocomplete="new-password"
+                    minlength="8"
+                    required
+                    data-password-input
+                  />
+                  <button
+                    type="button"
+                    class="admin-password-toggle"
+                    data-password-toggle
+                    aria-label="Mostrar contrasena"
+                    aria-pressed="false"
+                  >
+                    <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                  </button>
+                </div>
+              </label>
+            </div>
+
+            <div class="space-y-4 rounded-[28px] border border-white/10 bg-black/20 p-4 sm:p-5" data-membership-panel>
+              <div>
+                <p class="portal-copy text-xs uppercase tracking-[0.14em]">Asignar consultor</p>
+                <p class="portal-copy mt-1 text-sm">
+                  Si seleccionas un consultor, el usuario quedara asociado aunque sea administrador.
+                </p>
+              </div>
+
+              <label class="block">
+                <span class="mb-2 block text-sm font-medium text-white/80">Consultor</span>
+                <select
+                  class="portal-input w-full rounded-2xl px-4 py-3"
+                  name="client_id"
+                  data-membership-required="true"
+                >
+                  <option value="">Selecciona consultor</option>
+                  {clients.map((client) => (
+                    <option value={client.id}>{client.name}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label class="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/80">
+                <input type="hidden" name="membership_is_active" value="false" />
+                <input type="checkbox" name="membership_is_active" value="true" checked class="h-4 w-4" />
+                Membresia activa
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-users-dialog__footer flex flex-wrap items-center justify-end gap-3 border-t border-white/10 px-5 py-4 sm:px-6">
+          <button type="button" class="portal-action-link" data-close-dialog>
+            Cancelar
+          </button>
+          <button type="submit" class="portal-action-link portal-action-link--solid">
+            Guardar usuario
+          </button>
+        </div>
+      </form>
+    </div>
+  </dialog>
+</AdminLayout>
+
+<style>
+  .admin-users-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .admin-users-search {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: min(100%, 420px);
+    padding: 0.9rem 1rem;
+    border-radius: 1.1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .admin-users-search i {
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .admin-users-search input {
+    width: 100%;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #fff;
+    font: inherit;
+  }
+
+  .admin-users-search input::placeholder {
+    color: rgba(255, 255, 255, 0.42);
+  }
+
+  .admin-users-head,
+  .admin-users-row {
+    display: grid;
+    grid-template-columns: minmax(260px, 2fr) minmax(120px, 0.8fr) minmax(90px, 0.65fr) minmax(170px, 1.3fr) minmax(110px, 0.8fr) minmax(80px, 0.55fr);
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .admin-users-head {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 0 1rem 0.9rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .admin-users-row {
+    width: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 1.35rem;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 0.95rem 1rem;
+    text-align: left;
+    transition: border-color 180ms ease, background-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+  }
+
+  .admin-users-row:hover {
+    border-color: rgba(239, 124, 14, 0.36);
+    background: rgba(255, 255, 255, 0.06);
+    transform: translateY(-1px);
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.18);
+  }
+
+  .admin-users-row:focus-visible {
+    outline: 2px solid rgba(255, 140, 26, 0.7);
+    outline-offset: 3px;
+  }
+
+  .admin-users-row__identity {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.8rem;
+  }
+
+  .admin-users-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+
+  .admin-users-avatar--large {
+    width: 3.4rem;
+    height: 3.4rem;
+    border-radius: 1.2rem;
+    font-size: 0.95rem;
+  }
+
+  .admin-users-row__role,
+  .admin-users-row__metric strong,
+  .admin-users-row__client {
+    font-size: 0.92rem;
+    color: #fff;
+  }
+
+  .admin-users-row__role,
+  .admin-users-row__metric,
+  .admin-users-row__client {
+    display: grid;
+    gap: 0.15rem;
+  }
+
+  .admin-users-row__metric-label {
+    display: none;
+    font-size: 0.68rem;
+    line-height: 1;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.45);
+  }
+
+  .admin-users-dialog {
+    width: min(1080px, calc(100vw - 2rem));
+    max-width: 1080px;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    color: inherit;
+  }
+
+  .admin-users-dialog--compact {
+    width: min(760px, calc(100vw - 2rem));
+    max-width: 760px;
+  }
+
+  .admin-users-dialog::backdrop {
+    background: rgba(8, 6, 14, 0.82);
+    backdrop-filter: blur(10px);
+  }
+
+  .admin-users-dialog__panel {
+    overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.38);
+  }
+
+  .admin-users-dialog__header,
+  .admin-users-dialog__footer {
+    background: rgba(13, 10, 20, 0.92);
+    backdrop-filter: blur(18px);
+  }
+
+  .admin-users-dialog__footer {
+    position: sticky;
+    bottom: 0;
+  }
+
+  .admin-password-field {
+    position: relative;
+  }
+
+  .admin-password-field input {
+    padding-right: 3.4rem;
+  }
+
+  .admin-password-toggle {
+    position: absolute;
+    top: 50%;
+    right: 0.85rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border: 0;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.58);
+    transform: translateY(-50%);
+    cursor: pointer;
+    transition: color 180ms ease;
+  }
+
+  .admin-password-toggle:hover {
+    color: #fff;
+  }
+
+  .admin-password-toggle:focus-visible {
+    outline: 2px solid rgba(255, 140, 26, 0.7);
+    outline-offset: 2px;
+    border-radius: 999px;
+  }
+
+  @media (max-width: 1023px) {
+    .admin-users-head {
+      display: none;
+    }
+
+    .admin-users-row {
+      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-areas:
+        "identity state"
+        "role role"
+        "memberships client";
+      align-items: start;
+      gap: 0.8rem;
+    }
+
+    .admin-users-row__identity {
+      grid-area: identity;
+    }
+
+    .admin-users-row__state {
+      grid-area: state;
+    }
+
+    .admin-users-row__role {
+      grid-area: role;
+      padding: 0.7rem 0.75rem;
+      border-radius: 0.95rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .admin-users-row__metric {
+      grid-area: memberships;
+      padding: 0.7rem 0.75rem;
+      border-radius: 0.95rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .admin-users-row__client {
+      grid-area: client;
+      padding: 0.7rem 0.75rem;
+      border-radius: 0.95rem;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .admin-users-row__metric-label {
+      display: block;
+    }
+
+    .admin-users-row__action {
+      display: none;
+    }
+  }
+
+  @media (max-width: 767px) {
+    .admin-users-dialog,
+    .admin-users-dialog--compact {
+      width: 100vw;
+      max-width: none;
+      height: 100dvh;
+      max-height: none;
+      margin: 0;
+    }
+
+    .admin-users-dialog__panel {
+      min-height: 100dvh;
+      border-radius: 0 !important;
+    }
+
+    .admin-users-dialog form {
+      max-height: 100dvh !important;
+    }
+
+    .admin-users-dialog__header,
+    .admin-users-dialog__footer {
+      position: sticky;
+      z-index: 5;
+    }
+
+    .admin-users-dialog__header {
+      top: 0;
+    }
+
+    .admin-users-toolbar {
+      align-items: stretch;
+    }
+
+    .admin-users-search {
+      width: 100%;
+    }
+
+    .admin-users-row {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-areas:
+        "identity"
+        "state"
+        "role"
+        "memberships"
+        "client";
+    }
+
+    .admin-users-dialog__body {
+      padding-left: 1rem;
+      padding-right: 1rem;
+      padding-top: 1rem;
+      padding-bottom: 1rem;
+      scrollbar-gutter: stable;
+    }
+
+    .admin-users-dialog__header,
+    .admin-users-dialog__footer {
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+
+    .admin-users-row__identity {
+      gap: 0.7rem;
+    }
+
+    .admin-users-row__role,
+    .admin-users-row__metric,
+    .admin-users-row__client {
+      min-width: 0;
+    }
+
+    .admin-users-dialog__body aside > div,
+    .admin-users-dialog__body .space-y-5 > form,
+    .admin-users-dialog__body .space-y-5 > div {
+      padding: 1rem;
+      border-radius: 1.25rem;
+    }
+  }
+</style>
+
+<script>
+  function resetDialogForm(dialog) {
+    if (!(dialog instanceof HTMLDialogElement) || dialog.dataset.resetOnOpen !== "true") {
+      return;
+    }
+
+    const form = dialog.querySelector("form");
+    if (form instanceof HTMLFormElement) {
+      form.reset();
+    }
+
+    dialog.querySelectorAll("[data-password-input]").forEach((field) => {
+      if (field instanceof HTMLInputElement) {
+        field.type = "password";
+      }
+    });
+
+    dialog.querySelectorAll("[data-password-toggle]").forEach((button) => {
+      if (!(button instanceof HTMLButtonElement)) return;
+
+      button.setAttribute("aria-pressed", "false");
+      button.setAttribute("aria-label", "Mostrar contrasena");
+
+      const icon = button.querySelector("i");
+      if (icon instanceof HTMLElement) {
+        icon.classList.add("fa-eye");
+        icon.classList.remove("fa-eye-slash");
+      }
+    });
+  }
+
+  function syncAdminMembershipState(scope) {
+    if (!(scope instanceof HTMLElement)) return;
+
+    const adminCheckbox = scope.querySelector("[data-admin-checkbox]");
+    const membershipPanel = scope.querySelector("[data-membership-panel]");
+
+    if (!(adminCheckbox instanceof HTMLInputElement) || !(membershipPanel instanceof HTMLElement)) {
+      return;
+    }
+
+    membershipPanel.classList.remove("hidden");
+
+    membershipPanel
+      .querySelectorAll("input, select, textarea")
+      .forEach((field) => {
+        if (
+          !(
+            field instanceof HTMLInputElement ||
+            field instanceof HTMLSelectElement ||
+            field instanceof HTMLTextAreaElement
+          )
+        ) {
+          return;
+        }
+
+        field.disabled = false;
+
+        if ("required" in field && field.dataset.membershipRequired === "true") {
+          field.required = !adminCheckbox.checked;
+        }
+      });
+  }
+
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    const confirmSubmitTrigger = target.closest("[data-confirm-submit]");
+    if (confirmSubmitTrigger instanceof HTMLButtonElement) {
+      const message =
+        confirmSubmitTrigger.dataset.confirmSubmit ||
+        "Esta accion no se puede deshacer. ¿Deseas continuar?";
+
+      if (!window.confirm(message)) {
+        event.preventDefault();
+        return;
+      }
+    }
+
+    const openTrigger = target.closest("[data-open-dialog]");
+    if (openTrigger instanceof HTMLElement) {
+      const dialogId = openTrigger.dataset.openDialog;
+      const dialog = dialogId ? document.getElementById(dialogId) : null;
+      if (dialog instanceof HTMLDialogElement) {
+        resetDialogForm(dialog);
+        dialog.showModal();
+        syncAdminMembershipState(dialog);
+      }
+      return;
+    }
+
+    const closeTrigger = target.closest("[data-close-dialog]");
+    if (closeTrigger instanceof HTMLElement) {
+      const dialog = closeTrigger.closest("dialog");
+      if (dialog instanceof HTMLDialogElement) {
+        dialog.close();
+      }
+      return;
+    }
+
+    const passwordToggle = target.closest("[data-password-toggle]");
+    if (passwordToggle instanceof HTMLButtonElement) {
+      const field = passwordToggle.closest(".admin-password-field");
+      const input = field?.querySelector("[data-password-input]");
+      const icon = passwordToggle.querySelector("i");
+
+      if (input instanceof HTMLInputElement) {
+        const nextType = input.type === "password" ? "text" : "password";
+        const isVisible = nextType === "text";
+        input.type = nextType;
+        passwordToggle.setAttribute("aria-pressed", String(isVisible));
+        passwordToggle.setAttribute(
+          "aria-label",
+          isVisible ? "Ocultar contrasena" : "Mostrar contrasena"
+        );
+
+        if (icon instanceof HTMLElement) {
+          icon.classList.toggle("fa-eye", !isVisible);
+          icon.classList.toggle("fa-eye-slash", isVisible);
+        }
+      }
+    }
+  });
+
+  document.addEventListener("input", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+
+    if (target.matches("[data-admin-checkbox]")) {
+      syncAdminMembershipState(target.closest("dialog"));
+      return;
+    }
+
+    if (!target.matches("[data-user-search]")) return;
+
+    const query = target.value.trim().toLowerCase();
+    const rows = document.querySelectorAll("[data-user-row]");
+    let visibleCount = 0;
+
+    rows.forEach((row) => {
+      if (!(row instanceof HTMLElement)) return;
+      const value = row.dataset.userSearchValue || "";
+      const match = !query || value.includes(query);
+      row.style.display = match ? "" : "none";
+      if (match) visibleCount += 1;
+    });
+
+    const emptyState = document.querySelector("[data-user-empty]");
+    if (emptyState instanceof HTMLElement) {
+      emptyState.classList.toggle("hidden", visibleCount > 0);
+    }
+  });
+
+  document.querySelectorAll("dialog[data-admin-dialog]").forEach((dialogNode) => {
+    if (!(dialogNode instanceof HTMLDialogElement)) return;
+
+    dialogNode.addEventListener("cancel", () => {
+      dialogNode.close();
+    });
+
+    dialogNode.addEventListener("click", (event) => {
+      if (event.target === dialogNode) {
+        dialogNode.close();
+      }
+    });
+
+    syncAdminMembershipState(dialogNode);
+  });
+</script>

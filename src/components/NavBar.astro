@@ -1,0 +1,61 @@
+﻿---
+import { brand, navLinks, socialLinks } from "../data/site";
+
+const navSocialLinks = socialLinks.filter((link) => link.label !== "Instagram");
+---
+
+<nav id="navbar" class="navbar fixed inset-x-0 top-0 z-50" aria-label="Main navigation">
+  <div class="navbar-inner mx-auto flex max-w-6xl items-center justify-between px-6">
+    <a class="navbar-brand logo-text" href="#header" aria-label={brand}>
+      <img
+        src="/consultant/assets/brand/logo-technized-text-white.png"
+        alt={brand}
+        class="logo-image logo-image--default h-[111px] w-auto md:h-[133px]"
+      />
+      <img
+        src="/consultant/assets/brand/logo-technized-header.png"
+        alt={brand}
+        class="logo-image logo-image--scrolled h-[67px] w-auto md:h-[80px]"
+      />
+    </a>
+
+    <button
+      class="navbar-toggler inline-flex h-10 w-10 items-center justify-center border-0 text-white lg:hidden"
+      type="button"
+      id="navbarSideCollapse"
+      aria-label="Toggle navigation"
+    >
+      <span class="flex flex-col gap-1">
+        <span class="block h-0.5 w-6 bg-white"></span>
+        <span class="block h-0.5 w-6 bg-white"></span>
+        <span class="block h-0.5 w-6 bg-white"></span>
+      </span>
+    </button>
+
+    <div class="offcanvas-collapse flex flex-col gap-6 lg:flex lg:flex-row lg:items-center" id="navbarsExampleDefault">
+      <ul class="navbar-nav flex flex-col gap-2 lg:flex-row lg:items-center lg:gap-6 lg:ml-auto">
+        {navLinks.map((link) => (
+          <li class="nav-item">
+            <a
+              class="nav-link"
+              aria-current={link.href === "#header" ? "page" : undefined}
+              href={link.href}
+            >
+              {link.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+      <span class="nav-item social-icons flex items-center">
+        {navSocialLinks.map((link) => (
+          <span class="fa-stack">
+            <a href={link.href} aria-label={link.label}>
+              <i class="fas fa-circle fa-stack-2x"></i>
+              <i class={link.icon + " fa-stack-1x"}></i>
+            </a>
+          </span>
+        ))}
+      </span>
+    </div>
+  </div>
+</nav>

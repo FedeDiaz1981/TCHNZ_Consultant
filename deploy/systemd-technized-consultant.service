@@ -1,0 +1,17 @@
+[Unit]
+Description=Technized Consultant Astro portal
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/Consultant
+EnvironmentFile=/var/www/Consultant/.env
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=4324
+ExecStart=/usr/bin/node ./dist/server/entry.mjs
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

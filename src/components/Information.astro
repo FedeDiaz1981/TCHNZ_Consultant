@@ -1,0 +1,31 @@
+﻿---
+import { informationCards } from "../data/site";
+---
+
+<section class="information">
+  <div class="w-full">
+    <div class="grid text-white md:grid-cols-3">
+      {informationCards.map((card, index) => (
+        <div
+          class={"text-center p-10 " + card.className}
+          style={
+            index === 0
+              ? "background-color: #723E98;"
+              : index === 1
+              ? "background-color: #46558A;"
+              : "background-color: #E9ECF1;"
+          }
+          data-aos="zoom-in"
+          data-aos-delay={index * 150}
+          data-aos-duration="900"
+        >
+          <span class="info-icon">
+            <i class={card.icon + " fa-3x"}></i>
+          </span>
+          <h4 class="py-3">{card.title}</h4>
+          <p class="para-light">{card.text}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

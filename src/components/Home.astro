@@ -1,0 +1,15 @@
+﻿---
+import { hero } from "../data/site";
+---
+
+<section class="home flex items-center" id="header">
+  <div class="mx-auto w-full max-w-6xl px-6 py-12 text-white" data-aos="fade-right">
+    <h1 class="headline">
+      {hero.headline} <span class="home_text">{hero.highlight}</span><br />{hero.tagline}
+    </h1>
+    <p class="para para-light py-3">{hero.description}</p>
+    <div class="my-3">
+      <a class="btn" href={hero.cta.href}><span>{hero.cta.label}</span></a>
+    </div>
+  </div>
+</section>

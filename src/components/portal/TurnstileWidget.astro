@@ -1,0 +1,361 @@
+---
+import { getCustomerUi, type CustomerLocale } from "../../lib/i18n/customers";
+
+interface Props {
+  siteKey?: string;
+  action?: string;
+  locale?: CustomerLocale;
+}
+
+const {
+  siteKey,
+  action = "portal_access",
+  locale = "es"
+} = Astro.props;
+
+const ui = getCustomerUi(locale).turnstile;
+---
+
+<div class="space-y-3" data-turnstile-root data-site-key={siteKey} data-action={action}>
+  {
+    siteKey ? (
+      <>
+        <div class="portal-turnstile-custom rounded-2xl border border-white/12 bg-[rgba(15,11,22,0.82)] px-4 py-4">
+          <button
+            type="button"
+            class="portal-turnstile-check"
+            data-turnstile-trigger
+            aria-checked="false"
+          >
+            <span class="portal-turnstile-box" aria-hidden="true">
+              <i class="fa-solid fa-check"></i>
+            </span>
+            <span class="portal-turnstile-copy">
+              <strong class="portal-turnstile-title">{ui.title}</strong>
+              <span class="portal-turnstile-status" data-turnstile-status>
+                {ui.idle}
+              </span>
+            </span>
+          </button>
+        </div>
+
+        <p class="portal-turnstile-feedback hidden" data-turnstile-feedback></p>
+
+        <div class="portal-turnstile-challenge" data-turnstile-challenge>
+          <div data-turnstile-container></div>
+        </div>
+
+        <input type="hidden" name="cf-turnstile-response" value="" data-turnstile-token />
+      </>
+    ) : (
+      <div class="rounded-2xl border border-amber-400/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+        {ui.notConfigured}
+      </div>
+    )
+  }
+</div>
+
+<style>
+  .portal-turnstile-custom {
+    display: flex;
+    align-items: center;
+    min-height: 82px;
+  }
+
+  .portal-turnstile-check {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 0.9rem;
+    border: 0;
+    background: transparent;
+    color: #fff;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .portal-turnstile-check:focus-visible {
+    outline: 2px solid rgba(255, 140, 26, 0.7);
+    outline-offset: 3px;
+    border-radius: 1rem;
+  }
+
+  .portal-turnstile-box {
+    display: inline-flex;
+    height: 1.55rem;
+    width: 1.55rem;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.45rem;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.04);
+    color: transparent;
+    transition:
+      border-color 180ms ease,
+      background-color 180ms ease,
+      color 180ms ease,
+      transform 180ms ease;
+  }
+
+  .portal-turnstile-copy {
+    display: grid;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+
+  .portal-turnstile-title {
+    font-size: 0.98rem;
+    font-weight: 600;
+    color: #fff;
+  }
+
+  .portal-turnstile-status {
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .portal-turnstile-feedback {
+    margin-top: -0.2rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(239, 68, 68, 0.24);
+    background: rgba(239, 68, 68, 0.1);
+    padding: 0.85rem 1rem;
+    font-size: 0.82rem;
+    color: #fecaca;
+  }
+
+  .portal-turnstile-feedback:not(.hidden) {
+    display: block;
+  }
+
+  .portal-turnstile-challenge {
+    overflow: hidden;
+  }
+
+  .portal-turnstile-challenge:not(.portal-turnstile-challenge--visible) {
+    max-height: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .portal-turnstile-challenge--visible {
+    margin-top: 0.25rem;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  [data-turnstile-state="loading"] .portal-turnstile-box {
+    border-color: rgba(255, 140, 26, 0.4);
+    background: rgba(255, 140, 26, 0.12);
+    color: rgba(255, 140, 26, 0.9);
+  }
+
+  [data-turnstile-state="loading"] .portal-turnstile-box i {
+    animation: portal-turnstile-pulse 1s ease-in-out infinite;
+  }
+
+  [data-turnstile-state="verified"] .portal-turnstile-box {
+    border-color: rgba(52, 211, 153, 0.35);
+    background: rgba(16, 185, 129, 0.16);
+    color: #d1fae5;
+  }
+
+  [data-turnstile-state="verified"] .portal-turnstile-status {
+    color: rgba(209, 250, 229, 0.82);
+  }
+
+  [data-turnstile-state="error"] .portal-turnstile-box {
+    border-color: rgba(248, 113, 113, 0.35);
+    background: rgba(239, 68, 68, 0.16);
+    color: #fecaca;
+  }
+
+  @keyframes portal-turnstile-pulse {
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+
+    50% {
+      transform: scale(0.88);
+      opacity: 0.7;
+    }
+  }
+</style>
+
+<script define:vars={{ turnstileUi: ui }}>
+  function setTurnstileState(root, state, statusText, feedbackText = "") {
+    if (!(root instanceof HTMLElement)) return;
+
+    root.dataset.turnstileState = state;
+
+    const trigger = root.querySelector("[data-turnstile-trigger]");
+    const status = root.querySelector("[data-turnstile-status]");
+    const feedback = root.querySelector("[data-turnstile-feedback]");
+    const tokenInput = root.querySelector("[data-turnstile-token]");
+    const isVerified = state === "verified";
+
+    if (trigger instanceof HTMLButtonElement) {
+      trigger.setAttribute("aria-checked", String(isVerified));
+      trigger.disabled = state === "loading";
+    }
+
+    if (status instanceof HTMLElement) {
+      status.textContent = statusText;
+    }
+
+    if (feedback instanceof HTMLElement) {
+      feedback.textContent = feedbackText;
+      feedback.classList.toggle("hidden", !feedbackText);
+    }
+
+    if (tokenInput instanceof HTMLInputElement && !isVerified) {
+      tokenInput.value = "";
+    }
+
+    syncTurnstileSubmitState(root);
+  }
+
+  function syncTurnstileSubmitState(root) {
+    if (!(root instanceof HTMLElement)) return;
+
+    const form = root.closest("form");
+    if (!(form instanceof HTMLFormElement)) return;
+
+    const submitControls = form.querySelectorAll('button[type="submit"], input[type="submit"]');
+    const isVerified = root.dataset.turnstileState === "verified";
+    const isBusy = root.dataset.turnstileState === "loading";
+
+    submitControls.forEach((control) => {
+      if (control instanceof HTMLButtonElement || control instanceof HTMLInputElement) {
+        control.disabled = !isVerified || isBusy;
+      }
+    });
+  }
+
+  function initializeTurnstileRoot(root) {
+    if (!(root instanceof HTMLElement) || root.dataset.turnstileReady === "true") return;
+    if (!window.turnstile?.render) return;
+
+    const siteKey = root.dataset.siteKey;
+    const action = root.dataset.action || "portal_access";
+    const container = root.querySelector("[data-turnstile-container]");
+    const challenge = root.querySelector("[data-turnstile-challenge]");
+    const tokenInput = root.querySelector("[data-turnstile-token]");
+
+    if (!siteKey || !(container instanceof HTMLElement) || !(tokenInput instanceof HTMLInputElement)) {
+      return;
+    }
+
+    const widgetId = window.turnstile.render(container, {
+      sitekey: siteKey,
+      theme: "dark",
+      appearance: "interaction-only",
+      execution: "execute",
+      action,
+      "response-field": false,
+      callback(token) {
+        tokenInput.value = token;
+        challenge?.classList.remove("portal-turnstile-challenge--visible");
+        setTurnstileState(root, "verified", turnstileUi.verified);
+      },
+      "error-callback"() {
+        challenge?.classList.remove("portal-turnstile-challenge--visible");
+        setTurnstileState(root, "error", turnstileUi.error, turnstileUi.validateError);
+      },
+      "expired-callback"() {
+        window.turnstile.reset(widgetId);
+        challenge?.classList.remove("portal-turnstile-challenge--visible");
+        setTurnstileState(root, "error", turnstileUi.error, turnstileUi.expiredError);
+      },
+      "timeout-callback"() {
+        window.turnstile.reset(widgetId);
+        challenge?.classList.remove("portal-turnstile-challenge--visible");
+        setTurnstileState(root, "error", turnstileUi.error, turnstileUi.timeoutError);
+      },
+      "before-interactive-callback"() {
+        challenge?.classList.add("portal-turnstile-challenge--visible");
+      },
+      "after-interactive-callback"() {
+        challenge?.classList.remove("portal-turnstile-challenge--visible");
+      }
+    });
+
+    root.dataset.turnstileWidgetId = String(widgetId);
+    root.dataset.turnstileReady = "true";
+    setTurnstileState(root, "idle", turnstileUi.idle);
+  }
+
+  function initializeTurnstileWidgets() {
+    if (!window.turnstile?.render) return false;
+
+    document.querySelectorAll("[data-turnstile-root]").forEach((root) => {
+      initializeTurnstileRoot(root);
+    });
+
+    return true;
+  }
+
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+
+    const trigger = target.closest("[data-turnstile-trigger]");
+    if (!(trigger instanceof HTMLButtonElement)) return;
+
+    const root = trigger.closest("[data-turnstile-root]");
+    if (!(root instanceof HTMLElement)) return;
+
+    const widgetId = root.dataset.turnstileWidgetId;
+    if (!widgetId || !window.turnstile?.execute) {
+      setTurnstileState(root, "error", turnstileUi.error, turnstileUi.loadError);
+      return;
+    }
+
+    if (root.dataset.turnstileState === "verified" || root.dataset.turnstileState === "loading") {
+      return;
+    }
+
+    setTurnstileState(root, "loading", turnstileUi.loading);
+    window.turnstile.execute(widgetId);
+  });
+
+  document.addEventListener("submit", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLFormElement)) return;
+
+    const root = target.querySelector("[data-turnstile-root]");
+    if (!(root instanceof HTMLElement) || !root.dataset.siteKey) return;
+
+    if (root.dataset.turnstileState !== "verified") {
+      event.preventDefault();
+      setTurnstileState(
+        root,
+        "error",
+        turnstileUi.error,
+        turnstileUi.submitError
+      );
+    }
+  });
+
+  const turnstileBootstrap = () => {
+    if (initializeTurnstileWidgets()) return;
+
+    let attempts = 0;
+    const interval = window.setInterval(() => {
+      attempts += 1;
+
+      if (initializeTurnstileWidgets() || attempts > 50) {
+        window.clearInterval(interval);
+      }
+    }, 200);
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", turnstileBootstrap, { once: true });
+  } else {
+    turnstileBootstrap();
+  }
+</script>

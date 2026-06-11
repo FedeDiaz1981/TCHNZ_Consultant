@@ -1,0 +1,356 @@
+---
+import PortalLayout from "../../layouts/PortalLayout.astro";
+import {
+  getAuthorizedApplications,
+  getCurrentPortalClient,
+  getPublicModuleApplications
+} from "../../lib/portal/client-access";
+import {
+  getCustomerLocale,
+  getCustomerUi,
+  getLocalizedApplicationBadge,
+  getLocalizedApplicationCategory,
+  getLocalizedApplicationDescription,
+  getLocalizedApplicationTag
+} from "../../lib/i18n/customers";
+import { getSectionHrefForPath } from "../../lib/portal/hosts";
+import { moduleRequiresAuth } from "../../lib/portal/modules";
+
+const user = Astro.locals.user;
+const profile = Astro.locals.profile;
+const supabase = Astro.locals.supabase;
+const portalModule = Astro.locals.portalModule;
+
+if (!supabase) {
+  return Astro.redirect("/consultant/login");
+}
+
+const locale = getCustomerLocale(Astro.url, Astro.cookies);
+const ui = getCustomerUi(locale).applications;
+const requiresAuth = moduleRequiresAuth(portalModule);
+const currentClient =
+  requiresAuth && user ? await getCurrentPortalClient(supabase, user.id, portalModule) : null;
+const applications =
+  requiresAuth
+    ? currentClient
+      ? await getAuthorizedApplications(supabase, currentClient.id, portalModule)
+      : []
+    : await getPublicModuleApplications(supabase, portalModule);
+
+const iconMap: Record<string, string> = {
+  clock: "fa-regular fa-clock",
+  newspaper: "fa-regular fa-newspaper",
+  tool: "fa-solid fa-screwdriver-wrench",
+  book: "fa-solid fa-book-open",
+  bolt: "fa-solid fa-bolt",
+  chart: "fa-solid fa-chart-line",
+  folder: "fa-regular fa-folder-open"
+};
+
+const accessTierLabels = ui.accessTier;
+
+const availabilityLabels = ui.availability;
+
+const applicationCards = applications.map((item) => {
+  const localizedCategory = getLocalizedApplicationCategory(locale, item.category);
+  const localizedAreaTags = item.areaTags.map((tag) => getLocalizedApplicationTag(locale, tag));
+  const localizedBadgeLabel =
+    getLocalizedApplicationBadge(locale, item.badgeLabel) ?? accessTierLabels[item.accessTier];
+  const localizedDescription =
+    getLocalizedApplicationDescription(locale, item.slug, item.description) ?? ui.defaultDescription;
+
+  return {
+    ...item,
+    category: localizedCategory,
+    areaTags: localizedAreaTags,
+    iconClass: iconMap[item.icon ?? ""] ?? "fa-solid fa-layer-group",
+    accessLabel: accessTierLabels[item.accessTier],
+    availabilityLabel: availabilityLabels[item.availabilityStatus],
+    badgeLabel: localizedBadgeLabel,
+    description: localizedDescription,
+    isLaunchable: item.availabilityStatus === "available",
+    launchUrl: getSectionHrefForPath(Astro.url, item.url),
+    searchIndex: [
+      item.name,
+      localizedDescription,
+      item.description ?? "",
+      localizedCategory,
+      item.category,
+      localizedAreaTags.join(" "),
+      item.areaTags.join(" "),
+      localizedBadgeLabel,
+      item.badgeLabel ?? "",
+      accessTierLabels[item.accessTier],
+      availabilityLabels[item.availabilityStatus]
+    ]
+      .join(" ")
+      .toLowerCase()
+  };
+});
+
+const categoryOptions = Array.from(new Set(applicationCards.map((item) => item.category))).sort();
+const accessOptions = Array.from(new Set(applicationCards.map((item) => item.accessTier)));
+const tagOptions = Array.from(new Set(applicationCards.flatMap((item) => item.areaTags))).sort();
+const availableCount = applicationCards.filter((item) => item.isLaunchable).length;
+const adminHref = getSectionHrefForPath(Astro.url, "/admin");
+---
+
+<PortalLayout
+  title={`${ui.title} | ${currentClient?.name ?? "Technized"}`}
+  description={ui.description}
+  userEmail={user?.email ?? ""}
+  activePath="/clientes/aplicaciones"
+  clientName={currentClient?.name ?? ""}
+  clientLogoUrl={currentClient?.logoUrl ?? ""}
+  locale={locale}
+  portalModule={portalModule}
+  profileRole={profile?.role ?? ""}
+  adminHref={adminHref}
+>
+  <section class="portal-panel portal-catalog-shell rounded-[32px] p-6 md:p-8">
+    {requiresAuth && !currentClient ? (
+      <div class="portal-notice rounded-3xl p-6">
+        {ui.noClient}
+      </div>
+    ) : (
+      <>
+        <div class="portal-catalog-hero">
+          <div>
+            <p class="portal-eyebrow">{ui.eyebrow}</p>
+            <div class="portal-catalog-hero__art portal-catalog-hero__art--photo mt-5">
+              <div class="portal-catalog-hero__content">
+                <p class="portal-catalog-hero__kicker">{ui.heroKicker}</p>
+                <h2>{ui.heroTitle}</h2>
+              </div>
+            </div>
+          </div>
+
+          <div class="portal-catalog-summary-grid">
+            <div class="portal-catalog-stat">
+              <span class="portal-catalog-stat__label">{ui.enabledTools}</span>
+              <strong>{applicationCards.length}</strong>
+              <span class="portal-catalog-stat__meta">{ui.enabledToolsMeta}</span>
+            </div>
+
+            <div class="portal-catalog-stat">
+              <span class="portal-catalog-stat__label">{ui.readyTools}</span>
+              <strong>{availableCount}</strong>
+              <span class="portal-catalog-stat__meta">{ui.readyToolsMeta}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="portal-catalog-search mt-8">
+          <label class="portal-catalog-search__field">
+            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+            <input
+              id="catalog-search"
+              class="portal-input"
+              type="search"
+              placeholder={ui.searchPlaceholder}
+              autocomplete="off"
+            />
+          </label>
+        </div>
+
+        {applicationCards.length === 0 ? (
+          <div class="portal-empty-state mt-8 rounded-3xl p-6">
+            {ui.noTools}
+          </div>
+        ) : (
+          <div class="portal-catalog-layout mt-8">
+            <aside class="portal-catalog-sidebar">
+              <div class="portal-catalog-filter-group">
+                <p class="portal-catalog-filter-group__title">{ui.category}</p>
+                <div class="portal-catalog-chip-list" data-filter-group="category">
+                  <button class="portal-filter-chip is-active" type="button" data-filter="all">{ui.all}</button>
+                  {categoryOptions.map((category) => (
+                    <button class="portal-filter-chip" type="button" data-filter={category}>
+                      {category}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div class="portal-catalog-filter-group">
+                <p class="portal-catalog-filter-group__title">{ui.accessStatus}</p>
+                <div class="portal-catalog-chip-list" data-filter-group="access">
+                  <button class="portal-filter-chip is-active" type="button" data-filter="all">{ui.all}</button>
+                  {accessOptions.map((access) => (
+                    <button class="portal-filter-chip" type="button" data-filter={access}>
+                      {accessTierLabels[access]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div class="portal-catalog-filter-group">
+                <p class="portal-catalog-filter-group__title">{ui.areas}</p>
+                <div class="portal-catalog-chip-list" data-filter-group="tag">
+                  <button class="portal-filter-chip is-active" type="button" data-filter="all">{ui.all}</button>
+                  {tagOptions.map((tag) => (
+                    <button class="portal-filter-chip" type="button" data-filter={tag}>
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </aside>
+
+            <div class="portal-catalog-results">
+              <div class="portal-catalog-results__toolbar">
+                <div>
+                  <h3 class="text-2xl font-semibold">
+                    {ui.results} <span id="catalog-visible-count">{applicationCards.length}</span>{" "}
+                    {ui.resultsSuffix}
+                  </h3>
+                </div>
+              </div>
+
+              <div id="catalog-empty-state" class="portal-empty-state hidden rounded-3xl p-6">
+                {ui.emptyFilter}
+              </div>
+
+              <div class="portal-catalog-grid" id="catalog-grid">
+                {applicationCards.map((item) => (
+                  <article
+                    class:list={[
+                      "portal-catalog-card",
+                      item.availabilityStatus !== "available" && "is-muted"
+                    ]}
+                    data-search={item.searchIndex}
+                    data-category={item.category}
+                    data-access={item.accessTier}
+                    data-tags={item.areaTags.join("|")}
+                  >
+                    <div class="portal-catalog-card__top">
+                      <div class="portal-catalog-card__icon">
+                        <i class={item.iconClass} aria-hidden="true"></i>
+                      </div>
+
+                      <div class="portal-catalog-card__badges">
+                        <span class={`portal-card-badge is-${item.accessTier}`}>{item.badgeLabel}</span>
+                        {item.availabilityStatus !== "available" && (
+                          <span class="portal-card-badge is-neutral">{item.availabilityLabel}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div class="portal-catalog-card__body">
+                      <div class="portal-catalog-card__meta">
+                        <span>{item.category}</span>
+                        <span class="portal-catalog-card__dot"></span>
+                        <span>{item.availabilityLabel}</span>
+                      </div>
+
+                      <h3>{item.name}</h3>
+                      <p class="portal-copy">
+                        {item.description}
+                      </p>
+
+                      <div class="portal-catalog-card__tags">
+                        {item.areaTags.map((tag) => (
+                          <span class="portal-tag">{tag}</span>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div class="portal-catalog-card__footer">
+                      <div class="portal-catalog-card__status">
+                        <strong>{item.accessLabel}</strong>
+                        <span>{item.isLaunchable ? ui.accessAvailableNow : ui.visibleNotEnabled}</span>
+                      </div>
+
+                      {item.isLaunchable ? (
+                        <a
+                          href={item.launchUrl}
+                          class="portal-action-link portal-action-link--solid"
+                        >
+                          {ui.openTool}
+                        </a>
+                      ) : (
+                        <span class="portal-action-link portal-action-link--disabled">
+                          {item.availabilityStatus === "coming_soon" ? ui.comingSoon : ui.noAccess}
+                        </span>
+                      )}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </>
+    )}
+  </section>
+
+  <p class="mt-8 text-center text-xs font-medium tracking-[0.18em] text-white/45">
+    {ui.footer}
+  </p>
+
+  <script is:inline>
+    (() => {
+      const searchInput = document.getElementById("catalog-search");
+      const cards = Array.from(document.querySelectorAll(".portal-catalog-card"));
+      const visibleCount = document.getElementById("catalog-visible-count");
+      const emptyState = document.getElementById("catalog-empty-state");
+
+      if (!searchInput || cards.length === 0 || !visibleCount || !emptyState) return;
+
+      const activeFilters = {
+        category: "all",
+        access: "all",
+        tag: "all"
+      };
+
+      const applyFilters = () => {
+        const query = searchInput.value.trim().toLowerCase();
+        let visible = 0;
+
+        cards.forEach((card) => {
+          const searchIndex = card.dataset.search ?? "";
+          const category = card.dataset.category ?? "";
+          const access = card.dataset.access ?? "";
+          const tags = (card.dataset.tags ?? "").split("|").filter(Boolean);
+
+          const matchesQuery = !query || searchIndex.includes(query);
+          const matchesCategory =
+            activeFilters.category === "all" || category === activeFilters.category;
+          const matchesAccess =
+            activeFilters.access === "all" || access === activeFilters.access;
+          const matchesTag =
+            activeFilters.tag === "all" || tags.includes(activeFilters.tag);
+
+          const shouldShow = matchesQuery && matchesCategory && matchesAccess && matchesTag;
+          card.classList.toggle("is-hidden", !shouldShow);
+
+          if (shouldShow) visible += 1;
+        });
+
+        visibleCount.textContent = String(visible);
+        emptyState.classList.toggle("hidden", visible > 0);
+      };
+
+      searchInput.addEventListener("input", applyFilters);
+
+      document.querySelectorAll("[data-filter-group]").forEach((group) => {
+        group.addEventListener("click", (event) => {
+          const target = event.target;
+          if (!(target instanceof HTMLButtonElement)) return;
+
+          const filterGroup = group.dataset.filterGroup;
+          const filterValue = target.dataset.filter;
+          if (!filterGroup || !filterValue) return;
+
+          activeFilters[filterGroup] = filterValue;
+
+          group.querySelectorAll(".portal-filter-chip").forEach((button) => {
+            button.classList.toggle("is-active", button === target);
+          });
+
+          applyFilters();
+        });
+      });
+    })();
+  </script>
+</PortalLayout>

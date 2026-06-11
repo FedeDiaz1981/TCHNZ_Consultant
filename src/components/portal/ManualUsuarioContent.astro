@@ -1,0 +1,448 @@
+---
+import type { CustomerLocale } from "../../lib/i18n/customers";
+
+interface ManualStep {
+  number: string;
+  tone: "blue" | "green";
+  text: string;
+}
+
+interface ManualSection {
+  heading: string;
+  body?: string;
+  highlight?: boolean;
+}
+
+const {
+  locale = "es",
+} = Astro.props as {
+  locale?: CustomerLocale;
+};
+
+const manualCopy = {
+  es: {
+    overline: "Biogenesis Bago • Herramientas internas",
+    title: "Manual de Usuario",
+    subtitle: "Gestion y procesamiento de marcaciones industriales Time Tracking.",
+    purposeTitle: "Proposito del sistema",
+    purposeBody:
+      "Esta aplicacion actua como un motor de limpieza para los registros de asistencia. Toma datos brutos de relojes quimicos o digitales y los transforma en una estructura clara de Llegada/Salida, resolviendo discrepancias automaticamente.",
+    inputTitle: "Entrada",
+    inputBody: "Excel (.xlsx) o CSV con columnas de legajo, nombre y tiempos.",
+    outputTitle: "Salida",
+    outputBody: 'Reporte refinado con hoja adicional de auditoria "Errors & Info".',
+    expressGuide: "Guia express",
+    steps: [
+      { number: "1", tone: "blue", text: "Carga tu archivo de marcaciones original." },
+      { number: "2", tone: "blue", text: "Presiona el boton procesar y espera la validacion." },
+      { number: "3", tone: "green", text: "Descarga el reporte Refact_V13 final." },
+    ] satisfies ManualStep[],
+    smartLogic: "Logica inteligente",
+    logicSections: [
+      {
+        heading: "Identificacion de personas",
+        body: 'El sistema limpia automaticamente los legajos (ej: "L-1234" pasa a "1234") para asegurar que no se dupliquen registros por errores de escritura.',
+      },
+      {
+        heading: "Unificacion de jornada",
+        body: "Si una persona ficha varias veces al entrar o salir, el sistema elige inteligentemente la primera llegada y la ultima salida del dia para calcular el tiempo real de permanencia.",
+      },
+      {
+        heading: "Fusion turno noche",
+        body: "Si el sistema detecta una entrada hoy pero la salida es manana (con menos de 20hs de diferencia), une ambas marcas en un solo turno continuo automaticamente.",
+      },
+      {
+        heading: "Deteccion de columnas",
+        body: 'No importa el orden de tu archivo; el motor rastrea palabras clave como "ID", "Legajo" o "Evento" para entender tus datos sin configuracion previa.',
+      },
+      {
+        heading: "Alertas de revision",
+        body: 'Cualquier fichada olvidada (entrada sin salida o viceversa) se separa en la hoja "Errors & Info" para que puedas corregirla manualmente con facilidad.',
+        highlight: true,
+      },
+    ] satisfies ManualSection[],
+    processVisualization: "Visualizacion de procesamiento",
+    originLabel: "Origen (2 filas separadas)",
+    originExampleTop: "15/01 - 22:15 (Entrada)",
+    originExampleBottom: "16/01 - 06:45 (Salida)",
+    resultLabel: "Resultado unificado automatico:",
+    resultBody: "Jornada 15/01: 22:15 -> 06:45",
+    resultMeta: "(Fusion nocturna aplicada con exito)",
+    footer: "© 2026 Biogenesis Bago - Excelencia en procesos",
+  },
+  en: {
+    overline: "Biogenesis Bago • Internal tools",
+    title: "User Manual",
+    subtitle: "Management and processing of industrial time tracking records.",
+    purposeTitle: "System purpose",
+    purposeBody:
+      "This application works as a cleaning engine for attendance records. It takes raw data from chemical or digital clocks and transforms it into a clear Check-in/Check-out structure, resolving discrepancies automatically.",
+    inputTitle: "Input",
+    inputBody: "Excel (.xlsx) or CSV with employee ID, name and time columns.",
+    outputTitle: "Output",
+    outputBody: 'Refined report with an additional audit sheet named "Errors & Info".',
+    expressGuide: "Quick guide",
+    steps: [
+      { number: "1", tone: "blue", text: "Upload your original time clock file." },
+      { number: "2", tone: "blue", text: "Press the process button and wait for validation." },
+      { number: "3", tone: "green", text: "Download the final Refact_V13 report." },
+    ] satisfies ManualStep[],
+    smartLogic: "Smart logic",
+    logicSections: [
+      {
+        heading: "People identification",
+        body: 'The system automatically cleans employee IDs (for example, "L-1234" becomes "1234") so records are not duplicated due to typing inconsistencies.',
+      },
+      {
+        heading: "Shift consolidation",
+        body: "If a person clocks in or out multiple times, the system intelligently chooses the first arrival and the last departure of the day to calculate the real presence time.",
+      },
+      {
+        heading: "Night shift merge",
+        body: "If the system detects an entry today and the exit tomorrow (with less than 20 hours between them), it automatically merges both marks into a single continuous shift.",
+      },
+      {
+        heading: "Column detection",
+        body: 'The order of your file does not matter; the engine tracks keywords like "ID", "Employee ID" or "Event" to understand your data without prior configuration.',
+      },
+      {
+        heading: "Review alerts",
+        body: 'Any missing clocking (entry without exit or vice versa) is isolated in the "Errors & Info" sheet so you can correct it manually with ease.',
+        highlight: true,
+      },
+    ] satisfies ManualSection[],
+    processVisualization: "Processing visualization",
+    originLabel: "Source (2 separate rows)",
+    originExampleTop: "01/15 - 22:15 (Check-in)",
+    originExampleBottom: "01/16 - 06:45 (Check-out)",
+    resultLabel: "Automatic merged result:",
+    resultBody: "Shift 01/15: 22:15 -> 06:45",
+    resultMeta: "(Night merge applied successfully)",
+    footer: "© 2026 Biogenesis Bago - Process excellence",
+  },
+} as const;
+
+const copy = manualCopy[locale] ?? manualCopy.es;
+---
+
+<div class="manual-bg">
+  <div class="manual-shell max-w-7xl mx-auto p-6 md:p-12">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+      <slot name="back" />
+      <div class="flex items-center gap-4">
+        <slot name="badge" />
+        <slot name="download" />
+      </div>
+    </div>
+
+    <header class="mb-12">
+      <div class="flex items-center gap-3 mb-2">
+        <div class="manual-brand-mark p-2 rounded-xl text-white">
+          <i data-lucide="activity" class="w-6 h-6"></i>
+        </div>
+        <span class="manual-overline text-sm font-bold text-slate-500 uppercase tracking-widest">
+          {copy.overline}
+        </span>
+      </div>
+      <h1 class="text-4xl font-extrabold text-slate-900">{copy.title}</h1>
+      <p class="text-slate-500 mt-1">
+        {copy.subtitle}
+      </p>
+    </header>
+
+    <main class="manual-grid">
+      <div class="manual-row">
+        <section class="manual-card col-span-8">
+          <h2 class="text-xl font-bold mb-4 flex items-center gap-2 text-slate-800">
+            <i data-lucide="zap" class="text-blue-600"></i> {copy.purposeTitle}
+          </h2>
+          <p class="text-slate-600 leading-relaxed mb-4">
+            {copy.purposeBody}
+          </p>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="info-box">
+              <span class="font-bold block mb-1">{copy.inputTitle}</span>
+              {copy.inputBody}
+            </div>
+            <div class="info-box">
+              <span class="font-bold block mb-1">{copy.outputTitle}</span>
+              {copy.outputBody}
+            </div>
+          </div>
+        </section>
+
+        <section class="manual-card col-span-4">
+          <h3 class="text-lg font-bold mb-4 text-slate-800">{copy.expressGuide}</h3>
+          <div class="space-y-4">
+            {copy.steps.map((step) => (
+              <div class="flex gap-4">
+                <div
+                  class:list={[
+                    "w-8 h-8 rounded-full flex items-center justify-center font-bold flex-shrink-0",
+                    step.tone === "green"
+                      ? "bg-green-100 text-green-700"
+                      : "bg-blue-100 text-blue-700",
+                  ]}
+                >
+                  {step.number}
+                </div>
+                <p class="text-sm">{step.text}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
+      <div class="manual-row">
+        <section class="manual-card col-span-4">
+          <h3 class="text-lg font-bold mb-4 flex items-center gap-2 text-slate-800">
+            <i data-lucide="git-merge" class="text-blue-600"></i> {copy.smartLogic}
+          </h3>
+          <ul class="space-y-4 text-sm">
+            {copy.logicSections.map((section, index) => (
+              <li class:list={["pb-3", index < copy.logicSections.length - 1 && "border-b border-slate-100"]}>
+                <strong
+                  class:list={[
+                    "text-slate-800 block",
+                    section.highlight && "text-orange-600 font-bold",
+                  ]}
+                >
+                  {section.heading}
+                </strong>
+                {section.body}
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section class="manual-card col-span-8">
+          <h3 class="text-lg font-bold mb-4 text-slate-800">{copy.processVisualization}</h3>
+          <div class="bg-slate-50 rounded-xl p-6 border border-dashed border-slate-300">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+              <div class="text-center">
+                <span class="text-[10px] uppercase font-bold text-slate-400">
+                  {copy.originLabel}
+                </span>
+                <div class="mt-2 text-xs font-mono bg-white p-3 rounded shadow-sm border border-slate-200">
+                  {copy.originExampleTop}<br />
+                  {copy.originExampleBottom}
+                </div>
+              </div>
+              <i data-lucide="arrow-right-circle" class="text-blue-500 w-10 h-10 hidden md:block"></i>
+              <div class="bg-blue-600 text-white p-4 rounded-xl text-sm shadow-lg shadow-blue-200">
+                <span class="font-bold">{copy.resultLabel}</span><br />
+                {copy.resultBody} <br />
+                <span class="text-[10px] opacity-80">{copy.resultMeta}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="mt-12 pt-8 border-t border-slate-200 flex justify-between items-center text-slate-400 text-sm">
+      <p>{copy.footer}</p>
+      <div class="flex gap-4">
+        <i data-lucide="shield-check" class="w-5 h-5"></i>
+        <i data-lucide="database" class="w-5 h-5"></i>
+      </div>
+    </footer>
+  </div>
+</div>
+
+<style is:global>
+  .manual-bg {
+    background:
+      radial-gradient(circle at top right, rgba(239, 124, 14, 0.14), transparent 28%),
+      radial-gradient(circle at bottom left, rgba(118, 54, 140, 0.18), transparent 32%),
+      linear-gradient(180deg, #120d18 0%, #0f0b16 100%);
+    color: #fff;
+    font-family: 'Open Sans', sans-serif;
+  }
+
+  .manual-shell h1,
+  .manual-shell h2,
+  .manual-shell h3 {
+    font-family: 'Inter', sans-serif;
+    letter-spacing: -0.025em;
+  }
+
+  .manual-card {
+    background:
+      radial-gradient(120% 120% at 0% 0%, rgba(239, 124, 14, 0.08), transparent 45%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03));
+    border-radius: 18px;
+    padding: 24px;
+    border: 1px solid var(--surface-border);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(14px);
+  }
+
+  .manual-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(239, 124, 14, 0.4);
+    box-shadow: 0 26px 64px rgba(0, 0, 0, 0.26);
+  }
+
+  .manual-btn-premium {
+    background: linear-gradient(135deg, var(--tertiary), var(--secondary));
+    color: white;
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+    font-size: 14px;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 16px 30px rgba(239, 124, 14, 0.18);
+  }
+
+  .manual-btn-premium:hover {
+    box-shadow: 0 18px 34px rgba(239, 124, 14, 0.24);
+  }
+
+  .manual-btn-outline {
+    border: 2px solid var(--secondary);
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+    font-size: 14px;
+    background: rgba(255, 255, 255, 0.04);
+    text-decoration: none;
+  }
+
+  .manual-btn-outline:hover {
+    background: linear-gradient(135deg, var(--secondary), var(--tertiary));
+    color: white;
+  }
+
+  .manual-badge-green {
+    background: rgba(239, 124, 14, 0.14);
+    color: #ffd7b0;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .info-box {
+    background: rgba(255, 255, 255, 0.04);
+    border-left: 4px solid var(--secondary);
+    padding: 12px;
+    font-size: 14px;
+    border-radius: 0 8px 8px 0;
+    color: rgba(255, 255, 255, 0.8);
+  }
+
+  .manual-brand-mark {
+    background: linear-gradient(135deg, var(--tertiary), var(--secondary));
+    box-shadow: 0 12px 24px rgba(118, 54, 140, 0.22);
+  }
+
+  .manual-overline {
+    color: rgba(255, 255, 255, 0.58) !important;
+  }
+
+  .manual-shell .text-slate-900,
+  .manual-shell .text-slate-800,
+  .manual-shell .text-slate-600,
+  .manual-shell .text-slate-500,
+  .manual-shell .text-slate-400 {
+    color: inherit;
+  }
+
+  .manual-shell .text-slate-900 {
+    color: #fff !important;
+  }
+
+  .manual-shell .text-slate-800 {
+    color: #fff !important;
+  }
+
+  .manual-shell .text-slate-600,
+  .manual-shell .text-slate-500,
+  .manual-shell .text-slate-400 {
+    color: rgba(255, 255, 255, 0.72) !important;
+  }
+
+  .manual-shell .text-blue-600,
+  .manual-shell .text-blue-500,
+  .manual-shell .text-blue-700 {
+    color: var(--secondary) !important;
+  }
+
+  .manual-shell .text-orange-600 {
+    color: var(--secondary) !important;
+  }
+
+  .manual-shell .bg-blue-600 {
+    background: linear-gradient(135deg, var(--tertiary), var(--secondary)) !important;
+  }
+
+  .manual-shell .bg-blue-100 {
+    background: rgba(118, 54, 140, 0.22) !important;
+  }
+
+  .manual-shell .bg-green-100 {
+    background: rgba(239, 124, 14, 0.18) !important;
+  }
+
+  .manual-shell .text-green-700 {
+    color: #ffd7b0 !important;
+  }
+
+  .manual-shell .border-slate-100,
+  .manual-shell .border-slate-200,
+  .manual-shell .border-slate-300 {
+    border-color: rgba(255, 255, 255, 0.08) !important;
+  }
+
+  .manual-shell .bg-slate-50 {
+    background: rgba(255, 255, 255, 0.04) !important;
+  }
+
+  .manual-shell .bg-white {
+    background: rgba(255, 255, 255, 0.05) !important;
+  }
+
+  .manual-shell .shadow-blue-200,
+  .manual-shell .shadow-sm {
+    box-shadow: 0 16px 28px rgba(0, 0, 0, 0.14) !important;
+  }
+
+  .manual-shell [data-lucide='activity'] {
+    color: white;
+  }
+
+  .manual-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .manual-row {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    gap: 20px;
+  }
+
+  @media (max-width: 1024px) {
+    .manual-row {
+      display: flex;
+      flex-direction: column;
+    }
+  }
+</style>

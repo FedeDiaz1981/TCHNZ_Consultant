@@ -1,0 +1,185 @@
+---
+import { getCustomerLocale } from "../../../lib/i18n/customers";
+import { withPortalBasePath } from "../../../lib/portal/base-path";
+import { getSectionHrefForPath } from "../../../lib/portal/hosts";
+import { moduleRequiresAuth } from "../../../lib/portal/modules";
+
+const user = Astro.locals.user;
+const supabase = Astro.locals.supabase;
+const portalModule = Astro.locals.portalModule;
+
+if (!supabase) {
+  return Astro.redirect(withPortalBasePath("/login"));
+}
+
+const requiresAuth = moduleRequiresAuth(portalModule);
+const userEmail = requiresAuth ? user?.email ?? "" : "";
+const locale = getCustomerLocale(Astro.url, Astro.cookies);
+const appsHref = getSectionHrefForPath(Astro.url, "/clientes/aplicaciones");
+const frameSrc = withPortalBasePath("/api/consultant-tools/asana-xml-importer");
+
+const ui = {
+  es: {
+    title: "Asana XML Importer",
+    description: "Importador privado de XML de Microsoft Project hacia Asana.",
+    back: "Volver a aplicaciones",
+  },
+  en: {
+    title: "Asana XML Importer",
+    description: "Private Microsoft Project XML importer for Asana.",
+    back: "Back to applications",
+  },
+} as const;
+
+const copy = ui[locale] ?? ui.es;
+---
+
+<!doctype html>
+<html lang={locale}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{copy.title} | Technized Consultant</title>
+    <meta name="description" content={copy.description} />
+    <link rel="icon" href={withPortalBasePath("/favicon.png")} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --tool-bg: #09070d;
+        --tool-bg-2: #140d1d;
+        --tool-panel: rgba(24, 16, 30, 0.82);
+        --tool-border: rgba(255, 255, 255, 0.1);
+        --tool-text: #f4f1f8;
+        --tool-muted: #b8afc5;
+        --tool-accent: #ef7c0e;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        height: 100%;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Inter", system-ui, sans-serif;
+        color: var(--tool-text);
+        background:
+          radial-gradient(60% 80% at 50% 18%, rgba(118, 54, 140, 0.22), transparent 55%),
+          radial-gradient(35% 30% at 50% 48%, rgba(239, 124, 14, 0.1), transparent 60%),
+          linear-gradient(180deg, var(--tool-bg-2) 0%, var(--tool-bg) 100%);
+      }
+
+      .tool-shell {
+        min-height: 100%;
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+      }
+
+      .tool-topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 18px;
+        padding: 18px 24px;
+        border-bottom: 1px solid var(--tool-border);
+        background: rgba(43, 21, 54, 0.9);
+        box-shadow: 0 14px 38px rgba(0, 0, 0, 0.24);
+        backdrop-filter: blur(14px);
+      }
+
+      .tool-back {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        min-height: 42px;
+        padding: 0 14px;
+        border: 1px solid var(--tool-border);
+        border-radius: 14px;
+        color: #d8d1e1;
+        text-decoration: none;
+        font-weight: 800;
+        background: rgba(255, 255, 255, 0.04);
+      }
+
+      .tool-back:hover {
+        border-color: rgba(239, 124, 14, 0.38);
+      }
+
+      .tool-title {
+        margin: 0;
+        font-size: clamp(18px, 2.4vw, 24px);
+        line-height: 1.1;
+      }
+
+      .tool-meta {
+        margin: 4px 0 0;
+        color: var(--tool-muted);
+        font-size: 13px;
+        font-weight: 600;
+      }
+
+      .tool-user {
+        color: #efe9f7;
+        font-size: 14px;
+        font-weight: 700;
+        text-align: right;
+        word-break: break-word;
+      }
+
+      .tool-user span {
+        color: var(--tool-accent);
+      }
+
+      .tool-frame {
+        width: 100%;
+        height: 100%;
+        min-height: calc(100vh - 80px);
+        border: 0;
+        background: transparent;
+      }
+
+      @media (max-width: 720px) {
+        .tool-topbar {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .tool-user {
+          text-align: left;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="tool-shell">
+      <header class="tool-topbar">
+        <a class="tool-back" href={appsHref} aria-label={copy.back}>
+          <span aria-hidden="true">&#8592;</span>
+          {copy.back}
+        </a>
+        <div>
+          <h1 class="tool-title">{copy.title}</h1>
+          <p class="tool-meta">{copy.description}</p>
+        </div>
+        {userEmail && <div class="tool-user">Usuario <span>{userEmail}</span></div>}
+      </header>
+
+      <iframe
+        class="tool-frame"
+        src={frameSrc}
+        title={copy.title}
+        loading="eager"
+        referrerpolicy="same-origin"
+      ></iframe>
+    </main>
+  </body>
+</html>

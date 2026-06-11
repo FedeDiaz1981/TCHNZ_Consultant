@@ -1,0 +1,7 @@
+---
+import ReconversionApp from "./ReconversionApp.jsx";
+
+const { userEmail = "", locale = "es" } = Astro.props;
+---
+
+<ReconversionApp client:load userEmail={userEmail} locale={locale} />

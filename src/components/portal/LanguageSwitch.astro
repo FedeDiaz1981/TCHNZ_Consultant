@@ -1,0 +1,118 @@
+---
+import type { CustomerLocale } from "../../lib/i18n/customers";
+import { withPortalBasePath } from "../../lib/portal/base-path";
+
+interface Props {
+  locale: CustomerLocale;
+  redirectTo?: string;
+  label?: string;
+}
+
+const {
+  locale,
+  redirectTo = `${Astro.url.pathname}${Astro.url.search}`,
+  label = locale === "en" ? "Language" : "Idioma"
+} = Astro.props;
+
+const nextLocale = locale === "es" ? "en" : "es";
+---
+
+<form action={withPortalBasePath("/api/preferences/language")} method="POST" class="portal-language-switch">
+  <input type="hidden" name="lang" value={nextLocale} />
+  <input type="hidden" name="redirectTo" value={redirectTo} />
+
+  <button type="submit" class="portal-language-switch__button" aria-label={label}>
+    <span class="portal-language-switch__labels" aria-hidden="true">
+      <span class:list={["portal-language-switch__code", locale === "es" && "is-active"]}>ES</span>
+      <span class:list={["portal-language-switch__code", locale === "en" && "is-active"]}>EN</span>
+    </span>
+    <span class:list={["portal-language-switch__track", locale === "en" && "is-en"]}>
+      <span class="portal-language-switch__thumb"></span>
+    </span>
+  </button>
+</form>
+
+<style>
+  .portal-language-switch {
+    display: inline-flex;
+  }
+
+  .portal-language-switch__button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.7rem;
+    min-height: 2.75rem;
+    padding: 0.35rem 0.5rem 0.35rem 0.85rem;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03)),
+      rgba(255, 255, 255, 0.02);
+    color: #fff;
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(12px);
+    cursor: pointer;
+    transition:
+      border-color 180ms ease,
+      background-color 180ms ease,
+      transform 180ms ease;
+  }
+
+  .portal-language-switch__button:hover {
+    transform: translateY(-1px);
+    border-color: rgba(255, 140, 26, 0.34);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.05)),
+      rgba(255, 255, 255, 0.03);
+  }
+
+  .portal-language-switch__button:focus-visible {
+    outline: 2px solid rgba(255, 140, 26, 0.7);
+    outline-offset: 3px;
+  }
+
+  .portal-language-switch__labels {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.76rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .portal-language-switch__code {
+    color: rgba(255, 255, 255, 0.52);
+    transition: color 180ms ease;
+  }
+
+  .portal-language-switch__code.is-active {
+    color: #fff;
+  }
+
+  .portal-language-switch__track {
+    position: relative;
+    width: 2.65rem;
+    height: 1.4rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+    transition: background-color 180ms ease;
+  }
+
+  .portal-language-switch__thumb {
+    position: absolute;
+    top: 0.175rem;
+    left: 0.175rem;
+    width: 1.05rem;
+    height: 1.05rem;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #f8a63c, #eb7f18);
+    box-shadow: 0 6px 16px rgba(239, 124, 14, 0.25);
+    transition: transform 180ms ease;
+  }
+
+  .portal-language-switch__track.is-en .portal-language-switch__thumb {
+    transform: translateX(1.26rem);
+  }
+</style>

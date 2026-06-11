@@ -1,0 +1,555 @@
+﻿---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import { getAdminAccessMatrix, hasAccessPair } from "../../lib/portal/admin";
+import { getAdminFlash } from "../../lib/portal/admin-flash";
+import { getPortalModuleConfig } from "../../lib/portal/modules";
+
+const user = Astro.locals.user;
+const supabase = Astro.locals.supabase;
+const portalModule = Astro.locals.portalModule;
+const moduleConfig = getPortalModuleConfig(portalModule);
+
+if (!user || !supabase) {
+  return Astro.redirect("/consultant/login");
+}
+
+const flash = getAdminFlash(Astro.url);
+const matrix = await getAdminAccessMatrix(supabase, portalModule);
+
+function getEnabledCount(clientId: string) {
+  return matrix.applications.reduce((count, application) => {
+    return count + (hasAccessPair(matrix, clientId, application.id) ? 1 : 0);
+  }, 0);
+}
+---
+
+<AdminLayout
+  title={`Accesos ${moduleConfig.name.es} | Administracion portal`}
+  description={`Matriz de accesos por entidad y aplicacion de ${moduleConfig.name.es}`}
+  userEmail={user.email ?? ""}
+  activePath="/admin/accesos"
+  portalModule={portalModule}
+>
+  <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+    {flash && (
+      <div
+        class:list={[
+          "mb-6 rounded-3xl border px-4 py-3.5 text-sm sm:px-5 sm:py-4",
+          flash.tone === "error"
+            ? "border-red-400/30 bg-red-500/10 text-red-50"
+            : "border-emerald-400/30 bg-emerald-500/10 text-emerald-50"
+        ]}
+      >
+        {flash.message}
+      </div>
+    )}
+
+    <section class="space-y-6">
+      <div class="portal-panel rounded-[30px] p-5 sm:p-6">
+        <div class="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+          <div class="max-w-3xl">
+            <p class="portal-eyebrow text-[11px]">Control de permisos</p>
+            <h2 class="mt-2 text-2xl font-semibold text-white sm:text-3xl">Matriz de accesos</h2>
+            <p class="portal-copy mt-2 hidden text-sm leading-6 sm:block">
+              Activa o pausa herramientas por consultor desde una sola vista. Filtra por consultor o por
+              aplicacion para operar con mas foco.
+            </p>
+          </div>
+
+          <div class="flex flex-wrap gap-3 text-sm">
+            <span class="rounded-full bg-emerald-500/15 px-3 py-2 text-emerald-100">Habilitada</span>
+            <span class="rounded-full bg-white/10 px-3 py-2 text-white/70">No habilitada</span>
+          </div>
+        </div>
+      </div>
+
+      <section class="portal-panel rounded-[30px] p-0">
+        <div class="px-4 pt-4 sm:px-6 sm:pt-5">
+          <div class="admin-access-toolbar">
+            <label class="admin-access-search">
+              <i class="fa-solid fa-building" aria-hidden="true"></i>
+              <input type="search" placeholder="Buscar consultor" data-access-client-search />
+            </label>
+
+            <label class="admin-access-search">
+              <i class="fa-solid fa-layer-group" aria-hidden="true"></i>
+              <input type="search" placeholder="Buscar aplicacion" data-access-application-search />
+            </label>
+          </div>
+        </div>
+
+        <div class="px-4 pb-4 sm:px-6 sm:pb-5 lg:hidden">
+          <div class="mt-4 space-y-3">
+            {matrix.clients.map((client) => {
+              const enabledCount = getEnabledCount(client.id);
+              const clientSearchValue = `${client.name} ${client.slug} ${client.isActive ? "activo" : "inactivo"}`.toLowerCase();
+
+              return (
+                <article
+                  class="admin-access-mobile-card"
+                  data-access-mobile-card
+                  data-access-row-search-value={clientSearchValue}
+                >
+                  <div class="admin-access-mobile-card__header">
+                    <div class="min-w-0">
+                      <p class="truncate text-base font-semibold text-white">{client.name}</p>
+                      <p class="portal-copy mt-1 truncate text-xs">/{client.slug}</p>
+                    </div>
+
+                    <div class="flex flex-wrap justify-end gap-2">
+                      <span
+                        class:list={[
+                          "inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]",
+                          client.isActive
+                            ? "bg-emerald-500/15 text-emerald-100"
+                            : "bg-white/10 text-white/60"
+                        ]}
+                      >
+                        {client.isActive ? "Activo" : "Pausado"}
+                      </span>
+                      <span class="inline-flex rounded-full border border-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/70">
+                        {enabledCount}/{matrix.applications.length} apps
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="mt-4 space-y-3">
+                    {matrix.applications.map((application) => {
+                      const isEnabled = hasAccessPair(matrix, client.id, application.id);
+                      const appSearchValue = `${application.name} ${application.slug} ${application.category}`.toLowerCase();
+
+                      return (
+                        <div
+                          class="admin-access-mobile-app"
+                          data-access-mobile-item
+                          data-access-column-search-value={appSearchValue}
+                        >
+                          <div class="admin-access-mobile-app__copy">
+                            <p class="text-sm font-semibold text-white">{application.name}</p>
+                            <p class="portal-copy mt-1 text-xs">{application.category}</p>
+                            <p class="portal-copy mt-2 text-[11px] uppercase tracking-[0.14em]">
+                              {application.availabilityStatus}
+                            </p>
+                          </div>
+
+                          <form action="/consultant/api/admin/manage" method="POST">
+                            <input type="hidden" name="action" value="upsert-access" />
+                            <input type="hidden" name="redirect_to" value="/admin/accesos" />
+                            <input type="hidden" name="client_id" value={client.id} />
+                            <input type="hidden" name="application_id" value={application.id} />
+                            <input type="hidden" name="is_enabled" value={isEnabled ? "false" : "true"} />
+
+                            <button
+                              type="submit"
+                              class:list={[
+                                "admin-access-toggle",
+                                "admin-access-toggle--mobile",
+                                isEnabled ? "admin-access-toggle--on" : "admin-access-toggle--off"
+                              ]}
+                            >
+                              <span class="flex items-center justify-between gap-2">
+                                <span class="font-semibold">{isEnabled ? "On" : "Off"}</span>
+                                <i
+                                  class:list={[
+                                    "fa-solid",
+                                    isEnabled ? "fa-toggle-on text-emerald-300" : "fa-toggle-off text-white/35"
+                                  ]}
+                                  aria-hidden="true"
+                                ></i>
+                              </span>
+                              <span class="mt-2 block text-xs leading-5">
+                                {isEnabled ? "Click para pausar" : "Click para habilitar"}
+                              </span>
+                            </button>
+                          </form>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
+          <div class="portal-empty-state mt-4 hidden rounded-[24px] px-4 py-5 text-sm" data-access-empty-mobile>
+            No encontramos resultados para esa combinacion de filtros.
+          </div>
+        </div>
+
+        <div class="mt-4 hidden overflow-x-auto px-4 pb-4 sm:px-6 sm:pb-5 lg:block">
+          <table class="admin-access-table min-w-full border-separate border-spacing-0" data-access-table>
+            <thead>
+              <tr>
+                <th class="admin-access-table__corner">Consultor</th>
+                {matrix.applications.map((application, index) => (
+                  <th
+                    class:list={[
+                      "admin-access-table__head",
+                      index === matrix.applications.length - 1 && "admin-access-table__head--last"
+                    ]}
+                    data-access-column-header
+                    data-access-column={application.id}
+                    data-access-column-search-value={`${application.name} ${application.slug} ${application.category}`.toLowerCase()}
+                  >
+                    <div class="min-w-36">
+                      <p class="text-sm font-semibold text-white">{application.name}</p>
+                      <p class="portal-copy mt-1 text-xs">{application.category}</p>
+                      <p class="portal-copy mt-1 text-[11px] uppercase tracking-[0.14em]">
+                        {application.availabilityStatus}
+                      </p>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {matrix.clients.map((client, rowIndex) => (
+                <tr data-access-row data-access-row-search-value={`${client.name} ${client.slug} ${client.isActive ? "activo" : "inactivo"}`.toLowerCase()}>
+                  <td
+                    class:list={[
+                      "admin-access-table__client",
+                      rowIndex === matrix.clients.length - 1 && "admin-access-table__client--last"
+                    ]}
+                  >
+                    <div>
+                      <p class="font-semibold text-white">{client.name}</p>
+                      <p class="portal-copy mt-1 text-xs">/{client.slug}</p>
+                      <span
+                        class:list={[
+                          "mt-3 inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em]",
+                          client.isActive
+                            ? "bg-emerald-500/15 text-emerald-100"
+                            : "bg-white/10 text-white/60"
+                        ]}
+                      >
+                        {client.isActive ? "Activo" : "Pausado"}
+                      </span>
+                    </div>
+                  </td>
+
+                  {matrix.applications.map((application, columnIndex) => {
+                    const isEnabled = hasAccessPair(matrix, client.id, application.id);
+                    return (
+                      <td
+                        class:list={[
+                          "admin-access-table__cell",
+                          rowIndex === matrix.clients.length - 1 && "admin-access-table__cell--last",
+                          rowIndex === matrix.clients.length - 1 && columnIndex === matrix.applications.length - 1 && "admin-access-table__cell--corner"
+                        ]}
+                        data-access-column-cell
+                        data-access-column={application.id}
+                      >
+                        <form action="/consultant/api/admin/manage" method="POST">
+                          <input type="hidden" name="action" value="upsert-access" />
+                          <input type="hidden" name="redirect_to" value="/admin/accesos" />
+                          <input type="hidden" name="client_id" value={client.id} />
+                          <input type="hidden" name="application_id" value={application.id} />
+                          <input type="hidden" name="is_enabled" value={isEnabled ? "false" : "true"} />
+
+                          <button
+                            type="submit"
+                            class:list={[
+                              "admin-access-toggle",
+                              isEnabled
+                                ? "admin-access-toggle--on"
+                                : "admin-access-toggle--off"
+                            ]}
+                          >
+                            <span class="flex items-center justify-between gap-2">
+                              <span class="font-semibold">{isEnabled ? "On" : "Off"}</span>
+                              <i
+                                class:list={[
+                                  "fa-solid",
+                                  isEnabled ? "fa-toggle-on text-emerald-300" : "fa-toggle-off text-white/35"
+                                ]}
+                                aria-hidden="true"
+                              ></i>
+                            </span>
+                            <span class="mt-2 block text-xs leading-5">
+                              {isEnabled ? "Click para pausar" : "Click para habilitar"}
+                            </span>
+                          </button>
+                        </form>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div class="portal-empty-state mt-4 hidden rounded-[24px] px-4 py-5 text-sm" data-access-empty>
+            No encontramos resultados para esa combinacion de filtros.
+          </div>
+        </div>
+      </section>
+    </section>
+  </div>
+</AdminLayout>
+
+<style>
+  .admin-access-toolbar {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-access-search {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.9rem 1rem;
+    border-radius: 1.1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .admin-access-search i {
+    color: rgba(255, 255, 255, 0.5);
+  }
+
+  .admin-access-search input {
+    width: 100%;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #fff;
+    font: inherit;
+  }
+
+  .admin-access-search input::placeholder {
+    color: rgba(255, 255, 255, 0.42);
+  }
+
+  .admin-access-mobile-card {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 1.4rem;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 1rem;
+  }
+
+  .admin-access-mobile-card__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.85rem;
+  }
+
+  .admin-access-mobile-app {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.85rem;
+    padding: 0.85rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .admin-access-mobile-app__copy {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .admin-access-mobile-app form {
+    width: min(180px, 44vw);
+    flex: 0 0 auto;
+  }
+
+  .admin-access-table__corner,
+  .admin-access-table__head,
+  .admin-access-table__client,
+  .admin-access-table__cell {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .admin-access-table__corner,
+  .admin-access-table__head {
+    background: rgba(24, 18, 32, 0.94);
+  }
+
+  .admin-access-table__corner {
+    position: sticky;
+    left: 0;
+    z-index: 15;
+    min-width: 220px;
+    padding: 1rem;
+    text-align: left;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.5);
+    border-top-left-radius: 1.4rem;
+  }
+
+  .admin-access-table__head {
+    padding: 1rem;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .admin-access-table__head--last {
+    border-top-right-radius: 1.4rem;
+  }
+
+  .admin-access-table__client {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    min-width: 220px;
+    padding: 1rem;
+    vertical-align: top;
+    background: rgba(16, 12, 22, 0.96);
+  }
+
+  .admin-access-table__client--last {
+    border-bottom: 0;
+    border-bottom-left-radius: 1.4rem;
+  }
+
+  .admin-access-table__cell {
+    min-width: 170px;
+    padding: 0.85rem;
+    vertical-align: top;
+  }
+
+  .admin-access-table__cell--last {
+    border-bottom: 0;
+  }
+
+  .admin-access-table__cell--corner {
+    border-bottom-right-radius: 1.4rem;
+  }
+
+  .admin-access-toggle {
+    width: 100%;
+    border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 0.9rem;
+    text-align: left;
+    transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+  }
+
+  .admin-access-toggle:hover {
+    transform: translateY(-1px);
+  }
+
+  .admin-access-toggle--on {
+    border-color: rgba(52, 211, 153, 0.18);
+    background: rgba(16, 185, 129, 0.12);
+    color: #ecfdf5;
+  }
+
+  .admin-access-toggle--off {
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.72);
+  }
+
+  .admin-access-toggle--mobile {
+    min-height: 100%;
+  }
+
+  @media (max-width: 1023px) {
+    .admin-access-toolbar {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (max-width: 767px) {
+    .admin-access-toolbar {
+      grid-template-columns: 1fr;
+    }
+
+    .admin-access-mobile-card {
+      padding: 0.9rem;
+    }
+
+    .admin-access-mobile-app {
+      flex-direction: column;
+    }
+
+    .admin-access-mobile-app form {
+      width: 100%;
+    }
+  }
+</style>
+
+<script>
+  function applyAccessFilters() {
+    const clientInput = document.querySelector("[data-access-client-search]");
+    const applicationInput = document.querySelector("[data-access-application-search]");
+
+    const clientQuery = clientInput instanceof HTMLInputElement ? clientInput.value.trim().toLowerCase() : "";
+    const applicationQuery = applicationInput instanceof HTMLInputElement ? applicationInput.value.trim().toLowerCase() : "";
+
+    let visibleRows = 0;
+    document.querySelectorAll("[data-access-row]").forEach((row) => {
+      if (!(row instanceof HTMLElement)) return;
+      const value = row.dataset.accessRowSearchValue || "";
+      const match = !clientQuery || value.includes(clientQuery);
+      row.style.display = match ? "" : "none";
+      if (match) visibleRows += 1;
+    });
+
+    const matchingColumns = new Set();
+    document.querySelectorAll("[data-access-column-header]").forEach((header) => {
+      if (!(header instanceof HTMLElement)) return;
+      const value = header.dataset.accessColumnSearchValue || "";
+      const columnId = header.dataset.accessColumn || "";
+      const match = !applicationQuery || value.includes(applicationQuery);
+      header.style.display = match ? "" : "none";
+      if (match && columnId) {
+        matchingColumns.add(columnId);
+      }
+    });
+
+    document.querySelectorAll("[data-access-column-cell]").forEach((cell) => {
+      if (!(cell instanceof HTMLElement)) return;
+      const columnId = cell.dataset.accessColumn || "";
+      cell.style.display = !applicationQuery || matchingColumns.has(columnId) ? "" : "none";
+    });
+
+    let visibleMobileCards = 0;
+    document.querySelectorAll("[data-access-mobile-card]").forEach((card) => {
+      if (!(card instanceof HTMLElement)) return;
+
+      const clientValue = card.dataset.accessRowSearchValue || "";
+      const clientMatch = !clientQuery || clientValue.includes(clientQuery);
+      let visibleItems = 0;
+
+      card.querySelectorAll("[data-access-mobile-item]").forEach((item) => {
+        if (!(item instanceof HTMLElement)) return;
+
+        const value = item.dataset.accessColumnSearchValue || "";
+        const appMatch = !applicationQuery || value.includes(applicationQuery);
+        item.style.display = appMatch ? "" : "none";
+        if (appMatch) visibleItems += 1;
+      });
+
+      const isVisible = clientMatch && visibleItems > 0;
+      card.style.display = isVisible ? "" : "none";
+      if (isVisible) visibleMobileCards += 1;
+    });
+
+    const hasColumns = matchingColumns.size > 0 || !applicationQuery;
+    const desktopEmptyState = document.querySelector("[data-access-empty]");
+    if (desktopEmptyState instanceof HTMLElement) {
+      desktopEmptyState.classList.toggle("hidden", visibleRows > 0 && hasColumns);
+    }
+
+    const mobileEmptyState = document.querySelector("[data-access-empty-mobile]");
+    if (mobileEmptyState instanceof HTMLElement) {
+      mobileEmptyState.classList.toggle("hidden", visibleMobileCards > 0);
+    }
+  }
+
+  document.addEventListener("input", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (!target.matches("[data-access-client-search], [data-access-application-search]")) return;
+    applyAccessFilters();
+  });
+</script>

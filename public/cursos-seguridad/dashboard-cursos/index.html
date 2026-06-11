@@ -1,0 +1,1278 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de AnÃ¡lisis de Capacitaciones</title>
+    <script src="../vendor/tailwindcss-cdn.js"></script>
+    <script src="../vendor/chart.js"></script>
+    <script src="../vendor/supabase-js-v2.js"></script>
+    <script src="../vendor/xlsx.full.min.js"></script>
+    <script src="../vendor/jspdf.umd.min.js"></script>
+    <script src="../vendor/jspdf.plugin.autotable.min.js"></script>
+    <script src="../vendor/exceljs.min.js"></script>
+    <script src="../vendor/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --bg: #0a192f;
+            --panel: rgba(17, 34, 64, 0.90);
+            --panel-2: rgba(30, 41, 59, 0.92);
+            --line: rgba(148, 163, 184, 0.22);
+            --text: #e6f1ff;
+            --muted: #94a3b8;
+            --gold: #fbbf24;
+            --green: #22c55e;
+            --red: #ef4444;
+            --blue: #60a5fa;
+        }
+        html { scroll-behavior: smooth; }
+        body {
+            background: radial-gradient(circle at top left, rgba(37, 99, 235, .20), transparent 32%), var(--bg);
+            color: var(--text);
+            font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            min-height: 100vh;
+            margin: 0;
+        }
+        .topbar {
+            background: rgba(10, 25, 47, .96);
+            border-bottom: 1px solid var(--line);
+            backdrop-filter: blur(18px);
+            box-shadow: 0 18px 35px rgba(0,0,0,.28);
+        }
+        .topbar-inner { max-width: 1500px; }
+        .dashboard-shell { padding-top: 108px; }
+        .page-hero {
+            background: linear-gradient(135deg, rgba(17, 34, 64, .96), rgba(30, 41, 59, .88));
+            border: 1px solid rgba(148, 163, 184, .22);
+            box-shadow: 0 20px 55px rgba(0,0,0,.28);
+            border-radius: 24px;
+            padding: 28px;
+            position: relative;
+            overflow: hidden;
+        }
+        .page-hero::before {
+            content: "";
+            position: absolute;
+            inset: -120px -80px auto auto;
+            width: 320px;
+            height: 320px;
+            border-radius: 999px;
+            background: radial-gradient(circle, rgba(251, 191, 36, .22), transparent 62%);
+            pointer-events: none;
+        }
+        .page-hero-content { position: relative; z-index: 1; }
+        @media (max-width: 768px) { .dashboard-shell { padding-top: 96px; } .page-hero { padding: 22px; border-radius: 20px; } }
+        .topbar-menu-button {
+            width: 42px; height: 42px;
+            border-radius: 14px;
+            background: rgba(30, 41, 59, .94);
+            border: 1px solid rgba(148, 163, 184, .30);
+            color: white;
+            display: inline-flex; align-items: center; justify-content: center;
+            transition: all .18s ease;
+        }
+        .topbar-menu-button:hover { background: rgba(51, 65, 85, .98); transform: translateY(-1px); }
+        .menu-surface {
+            background: rgba(15, 23, 42, .98);
+            border: 1px solid rgba(148, 163, 184, .22);
+            box-shadow: 0 24px 70px rgba(0,0,0,.45);
+            backdrop-filter: blur(18px);
+        }
+        .menu-action {
+            width: 100%;
+            display: flex; align-items: center; gap: 12px;
+            text-align: left;
+            padding: 12px;
+            border-radius: 14px;
+            color: white;
+            transition: all .16s ease;
+        }
+        .menu-action:hover { background: rgba(51, 65, 85, .75); }
+        .menu-action-primary {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            color: #0f172a;
+        }
+        .menu-action-primary:hover { background: linear-gradient(135deg, #fcd34d, #f59e0b); }
+        .menu-action-icon {
+            width: 40px; height: 40px;
+            border-radius: 12px;
+            display: inline-flex; align-items: center; justify-content: center;
+            flex: 0 0 auto;
+        }
+        .topbar-export {
+            color: white;
+            border-radius: 14px;
+            padding: 10px 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 800;
+            box-shadow: 0 12px 24px rgba(0,0,0,.22);
+            transition: all .18s ease;
+        }
+        .topbar-export:hover { transform: translateY(-1px); }
+        .card, .kpi-card, .chart-card, .premium-section {
+            background-color: var(--panel);
+            backdrop-filter: blur(14px);
+            border: 1px solid var(--line);
+            box-shadow: 0 18px 45px rgba(0,0,0,.22);
+        }
+        .kpi-card { padding: 1.25rem; border-radius: 1rem; text-align: center; }
+        .chart-card { padding: 1.25rem; border-radius: 1rem; height: 405px; }
+        .chart-container { position: relative; height: 315px; width: 100%; }
+        .input-control {
+            width: 100%;
+            background: rgba(30, 41, 59, .92);
+            border: 1px solid rgba(148, 163, 184, .30);
+            border-radius: 12px;
+            padding: .70rem .85rem;
+            color: white;
+            outline: none;
+        }
+        .input-control:focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(251, 191, 36, .18); }
+        .btn-primary {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            color: #0f172a;
+            font-weight: 900;
+            border-radius: 12px;
+            padding: .72rem 1rem;
+            transition: all .18s ease;
+        }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.05); }
+        .btn-primary:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+        .btn-secondary {
+            background: rgba(51, 65, 85, .95);
+            color: white;
+            font-weight: 800;
+            border-radius: 12px;
+            padding: .72rem 1rem;
+            border: 1px solid rgba(148, 163, 184, .20);
+        }
+        .btn-secondary:hover { background: rgba(71, 85, 105, .95); }
+        .table-header { background: rgba(51, 65, 85, .96); color: #cbd5e1; text-transform: uppercase; font-size: .74rem; letter-spacing: .04em; }
+        .table-row { border-bottom: 1px solid rgba(51, 65, 85, .7); transition: background .15s ease; }
+        .table-row:hover { background: rgba(51, 65, 85, .55); }
+        .status-pill { display: inline-flex; align-items: center; justify-content: center; min-width: 94px; padding: .28rem .55rem; border-radius: 999px; font-size: .72rem; font-weight: 900; color: #0f172a; }
+        .status-ok { background: #4ade80; }
+        .status-risk { background: #f87171; }
+        .status-warn { background: #fbbf24; }
+        .status-neutral { background: #94a3b8; }
+        .notification {
+            padding: 1rem;
+            border-radius: 14px;
+            box-shadow: 0 18px 45px rgba(0,0,0,.30);
+            border: 1px solid rgba(255,255,255,.15);
+            animation: slideIn .25s ease-out;
+            max-width: 440px;
+        }
+        .notification-success { background: #16a34a; color: white; }
+        .notification-warning { background: #f59e0b; color: #0f172a; }
+        .notification-error { background: #dc2626; color: white; }
+        @keyframes slideIn { from { transform: translateX(40px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .modal-panel {
+            background: rgba(15, 23, 42, .985);
+            border: 1px solid rgba(148, 163, 184, .25);
+            box-shadow: 0 24px 80px rgba(0,0,0,.55);
+            border-radius: 22px;
+        }
+        .course-row.selected { background: rgba(251, 191, 36, .12); }
+        .preview-wrap { max-height: 360px; overflow: auto; border: 1px solid rgba(148,163,184,.22); border-radius: 14px; }
+        .log-wrap { max-height: 160px; overflow:auto; }
+        .mini-card { background: rgba(30,41,59,.75); border:1px solid rgba(148,163,184,.2); border-radius:14px; padding:12px; }
+        @media (max-width: 768px) {
+            .chart-card { height: 360px; }
+            .chart-container { height: 270px; }
+        }
+
+        .assignment-parameter-card {
+            background: linear-gradient(135deg, rgba(251,191,36,.14), rgba(30,41,59,.82));
+            border: 1px solid rgba(251,191,36,.34);
+            border-radius: 18px;
+            padding: 18px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 18px 45px rgba(0,0,0,.18);
+        }
+        .parameter-grid {
+            display: grid;
+            grid-template-columns: minmax(120px, .8fr) minmax(220px, 1.3fr) minmax(150px, .85fr) auto;
+            gap: 14px;
+            align-items: end;
+        }
+        .field-label {
+            display: block;
+            font-size: .78rem;
+            font-weight: 800;
+            color: #cbd5e1;
+            margin-bottom: 6px;
+        }
+        .field-help { font-size: .72rem; color: #94a3b8; margin-top: 6px; line-height: 1.25; }
+        .date-input-strong {
+            min-height: 46px;
+            border-color: rgba(251,191,36,.55);
+            background: rgba(15,23,42,.96);
+            font-weight: 800;
+            letter-spacing: .02em;
+        }
+        input[type="date"] { color-scheme: dark; }
+        input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+            opacity: .9;
+            cursor: pointer;
+        }
+        .modal-body-scroll { overflow-y: auto; }
+        @media (max-width: 1024px) {
+            .parameter-grid { grid-template-columns: 1fr 1fr; }
+        }
+        @media (max-width: 640px) {
+            .parameter-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+    <link rel="stylesheet" href="../consultant-theme.css">`r`n</head>
+<body class="antialiased">
+    <nav class="topbar fixed top-0 inset-x-0 z-50">
+        <div class="topbar-inner mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
+            <div class="relative flex items-center gap-3">
+                <button id="hamburgerMenuBtn" type="button" class="topbar-menu-button" aria-label="Abrir menÃº" aria-expanded="false">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                </button>
+                <div class="leading-tight">
+                    <p class="text-[11px] uppercase tracking-[0.25em] text-amber-300 font-bold">BlatoRH Learning</p>
+                    <p class="text-sm md:text-base text-white font-semibold">Panel de Capacitaciones</p>
+                </div>
+                <div id="actionsDropdown" class="hidden menu-surface absolute top-14 left-0 w-[340px] rounded-2xl p-3 shadow-2xl">
+                    <div class="px-3 pt-2 pb-3 border-b border-slate-700/70 mb-2">
+                        <p class="text-xs uppercase tracking-[0.22em] text-slate-400 font-bold">Acciones</p>
+                        <p class="text-sm text-slate-300 mt-1">GestiÃ³n y configuraciÃ³n del panel</p>
+                    </div>
+                    <button id="importAssignmentsBtn" class="menu-action menu-action-primary">
+                        <span class="menu-action-icon bg-amber-300 text-slate-950"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V8.414A2 2 0 0017.414 7L14 3.586A2 2 0 0012.586 3H4zm6 2a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"/></svg></span>
+                        <span><span class="block font-bold">Cargar consultores</span><span class="block text-xs text-slate-900/70">Excel + cursos marcados + aÃ±o</span></span>
+                    </button>
+                    <button id="settingsBtn" class="menu-action">
+                        <span class="menu-action-icon bg-slate-700 text-white"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" /></svg></span>
+                        <span><span class="block font-bold">Configurar panel</span><span class="block text-xs text-slate-400">KPIs y grÃ¡ficos visibles</span></span>
+                    </button>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button id="exportCSV" class="topbar-export bg-emerald-600 hover:bg-emerald-500"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg><span class="hidden sm:inline">Excel</span></button>
+                <button id="exportPDF" class="topbar-export bg-red-600 hover:bg-red-500"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg><span class="hidden sm:inline">PDF Ejecutivo</span></button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="dashboard-shell container mx-auto px-4 md:px-8 pb-8 max-w-[1500px]">
+        <header class="page-hero mb-8">
+            <div class="page-hero-content flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+                <div>
+                    <p class="text-amber-300 text-xs font-black uppercase tracking-[0.25em]">BlatoRH Group</p>
+                    <h1 class="text-3xl md:text-5xl font-black text-white mt-2 leading-tight">Dashboard de AnÃ¡lisis de Capacitaciones</h1>
+                    <p class="text-slate-300 mt-3 max-w-3xl">Vista ejecutiva del progreso, cumplimiento anual, asignaciones y resultados de los cursos.</p>
+                </div>
+                <div class="grid grid-cols-2 gap-3 min-w-[260px]">
+                    <div class="mini-card text-center"><div id="heroCurrentYear" class="text-2xl font-black text-amber-300">-</div><div class="text-xs text-slate-400 uppercase tracking-wider">AÃ±o actual</div></div>
+                    <div class="mini-card text-center"><div id="heroDataSource" class="text-2xl font-black text-green-300">-</div><div class="text-xs text-slate-400 uppercase tracking-wider">Fuente</div></div>
+                </div>
+            </div>
+        </header>
+
+        <section class="card rounded-2xl p-5 mb-8">
+            <div class="grid grid-cols-1 md:grid-cols-[1fr_220px_auto] gap-4 items-end">
+                <div>
+                    <label for="courseFilter" class="block text-sm font-medium text-slate-300 mb-1">Filtrar por Curso</label>
+                    <select id="courseFilter" class="input-control"><option value="all">Todos los Cursos</option></select>
+                </div>
+                <div>
+                    <label for="yearFilter" class="block text-sm font-medium text-slate-300 mb-1">Filtrar por AÃ±o</label>
+                    <select id="yearFilter" class="input-control"><option value="all">Todos los AÃ±os</option></select>
+                </div>
+                <button id="resetFilters" class="btn-primary">Resetear</button>
+            </div>
+        </section>
+
+        <div id="kpi-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="kpi-card"><h3 class="text-slate-400 text-base font-semibold">Total de Participantes</h3><p id="totalParticipants" class="text-4xl font-black mt-2">0</p></div>
+            <div class="kpi-card"><h3 class="text-slate-400 text-base font-semibold">Total de Cursos</h3><p id="totalCourses" class="text-4xl font-black mt-2">0</p></div>
+            <div class="kpi-card"><h3 class="text-slate-400 text-base font-semibold">Tasa de Cumplimiento</h3><p id="approvalRate" class="text-4xl font-black mt-2">0%</p></div>
+            <div class="kpi-card"><h3 class="text-slate-400 text-base font-semibold">Promedio CalificaciÃ³n</h3><p id="averageScore" class="text-4xl font-black mt-2">0</p></div>
+        </div>
+
+        <section class="premium-section rounded-2xl p-6 mb-8">
+            <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3 mb-5">
+                <div><p class="text-amber-300 text-xs font-black uppercase tracking-[0.22em]">Vista ejecutiva</p><h2 class="text-2xl font-black text-white mt-1">Cumplimiento anual por curso</h2><p class="text-slate-400 mt-1">Matriz por curso y aÃ±o con semÃ¡foro ejecutivo. Los cuadros comparan asignaciones a realizar contra cursos realizados y aprobados.</p></div>
+                <div class="text-sm text-slate-400">Cumplido â‰¥ 90%, En control â‰¥ 70%, Riesgo &lt; 70%</div>
+            </div>
+            <div id="annualSummaryCards" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-5"></div>
+            <div class="overflow-x-auto rounded-lg border border-slate-700"><table class="min-w-full"><thead id="annualComplianceHead" class="table-header"></thead><tbody id="annualComplianceBody" class="text-slate-300 text-sm"></tbody></table></div>
+        </section>
+
+
+
+        <section class="premium-section rounded-2xl p-6 mb-8">
+            <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3 mb-5">
+                <div>
+                    <p class="text-amber-300 text-xs font-black uppercase tracking-[0.22em]">Comparativo anual</p>
+                    <h2 class="text-2xl font-black text-white mt-1">Inscriptos y aprobados por curso y aÃ±o</h2>
+                    <p class="text-slate-400 mt-1">Cuadro comparativo para ver, por cada curso, cuÃ¡ntos consultores fueron inscriptos/asignados y cuÃ¡ntos aprobaron en cada aÃ±o.</p>
+                </div>
+                <div class="text-sm text-slate-400">Respeta el filtro de curso. Compara todos los aÃ±os disponibles.</div>
+            </div>
+            <div class="overflow-x-auto rounded-lg border border-slate-700">
+                <table class="min-w-full">
+                    <thead id="yearCourseComparisonHead" class="table-header"></thead>
+                    <tbody id="yearCourseComparisonBody" class="text-slate-300 text-sm"></tbody>
+                    <tfoot id="yearCourseComparisonFoot" class="bg-slate-800/80 text-slate-200 text-sm font-bold"></tfoot>
+                </table>
+            </div>
+        </section>
+
+        <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
+            <div class="chart-card lg:col-span-3"><h3 class="font-black text-xl mb-4">Rendimiento por Curso</h3><div class="chart-container"><canvas id="performanceByCourseChart"></canvas></div></div>
+            <div class="chart-card lg:col-span-2"><h3 class="font-black text-xl mb-4">Estado General</h3><div class="chart-container"><canvas id="overallStatusChart"></canvas></div></div>
+        </div>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div class="chart-card"><h3 class="font-black text-xl mb-4">EvoluciÃ³n por Mes</h3><div class="chart-container"><canvas id="evolutionChart"></canvas></div></div>
+            <div class="chart-card"><h3 class="font-black text-xl mb-4">Tendencia de Cumplimiento</h3><div class="chart-container"><canvas id="approvalTrendChart"></canvas></div></div>
+        </div>
+
+        <section class="card rounded-2xl p-6">
+            <h3 class="font-black text-xl mb-4">Detalle de Participantes</h3>
+            <div class="overflow-x-auto rounded-lg border border-slate-700">
+                <table class="min-w-full">
+                    <thead class="table-header"><tr><th class="py-3 px-5 text-left">Nombre</th><th class="py-3 px-5 text-left">Curso</th><th class="py-3 px-5 text-center">AÃ±o</th><th class="py-3 px-5 text-center">CalificaciÃ³n</th><th class="py-3 px-5 text-center">Estado</th><th class="py-3 px-5 text-left">Vencimiento</th><th class="py-3 px-5 text-left">Fecha</th></tr></thead>
+                    <tbody id="usersTableBody" class="text-slate-300 text-sm"></tbody>
+                </table>
+            </div>
+            <div class="flex flex-col sm:flex-row justify-between items-center gap-3 mt-4">
+                <div class="text-sm text-slate-400">Mostrando <span id="showingFrom">0</span> a <span id="showingTo">0</span> de <span id="totalRecords">0</span> registros</div>
+                <div class="flex items-center gap-2"><button id="prevPage" class="btn-secondary disabled:opacity-40">Anterior</button><span id="currentPage" class="px-3 py-1">1</span><button id="nextPage" class="btn-secondary disabled:opacity-40">Siguiente</button></div>
+            </div>
+        </section>
+    </div>
+
+    <div id="notificationContainer" class="fixed top-20 right-4 z-[80] space-y-2"></div>
+
+    <div id="settingsModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-[90] hidden p-4">
+        <div class="modal-panel p-6 w-full max-w-2xl">
+            <div class="flex justify-between items-center mb-5"><h3 class="text-xl font-black text-white">ConfiguraciÃ³n del Panel</h3><button id="closeSettings" class="text-slate-400 hover:text-white text-2xl">Ã—</button></div>
+            <div class="mb-6"><h4 class="text-lg font-bold text-white mb-3">KPIs Visibles</h4><div class="grid grid-cols-2 gap-3">
+                <label class="flex items-center gap-2"><input type="checkbox" id="kpi-participants" checked> <span>Total de Participantes</span></label>
+                <label class="flex items-center gap-2"><input type="checkbox" id="kpi-courses" checked> <span>Total de Cursos</span></label>
+                <label class="flex items-center gap-2"><input type="checkbox" id="kpi-approval" checked> <span>Tasa de Cumplimiento</span></label>
+                <label class="flex items-center gap-2"><input type="checkbox" id="kpi-score" checked> <span>Promedio CalificaciÃ³n</span></label>
+            </div></div>
+            <div class="mb-6"><h4 class="text-lg font-bold text-white mb-3">GrÃ¡ficos Visibles</h4><div class="grid grid-cols-1 gap-2">
+                <label class="flex items-center gap-2"><input type="checkbox" id="chart-performance" checked> <span>Rendimiento por Curso</span></label>
+                <label class="flex items-center gap-2"><input type="checkbox" id="chart-status" checked> <span>Estado General</span></label>
+                <label class="flex items-center gap-2"><input type="checkbox" id="chart-evolution" checked> <span>EvoluciÃ³n por Mes</span></label>
+                <label class="flex items-center gap-2"><input type="checkbox" id="chart-approval-trend" checked> <span>Tendencia de Cumplimiento</span></label>
+            </div></div>
+            <div class="flex justify-end gap-3"><button id="resetSettings" class="btn-secondary">Restablecer</button><button id="saveSettings" class="btn-primary">Guardar</button></div>
+        </div>
+    </div>
+
+    <div id="assignmentsModal" class="fixed inset-0 bg-black/80 flex items-center justify-center z-[90] hidden p-4">
+        <div class="modal-panel w-full max-w-7xl max-h-[calc(100vh-2rem)] overflow-hidden flex flex-col">
+            <div class="p-5 md:p-6 border-b border-slate-700 flex items-start justify-between gap-4">
+                <div><p class="text-amber-300 text-xs font-black uppercase tracking-[0.22em]">Carga masiva</p><h3 class="text-2xl font-black text-white mt-1">Cargar consultores y asignar cursos</h3><p class="text-slate-400 mt-1">El Excel solo debe contener consultores. Los cursos se toman automÃ¡ticamente desde <b>courses_unique</b>.</p></div>
+                <button id="closeAssignmentsModalBtn" class="text-slate-400 hover:text-white text-3xl leading-none">Ã—</button>
+            </div>
+            <div class="p-5 md:p-6 modal-body-scroll">
+                <div class="assignment-parameter-card mb-5">
+                    <div class="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4 mb-4">
+                        <div>
+                            <p class="text-amber-300 text-xs font-black uppercase tracking-[0.22em]">ParÃ¡metro anual obligatorio</p>
+                            <h4 class="font-black text-white text-xl mt-1">Fecha de vencimiento por aÃ±o</h4>
+                            <p class="text-sm text-slate-300 mt-1 max-w-3xl">AcÃ¡ se define el vencimiento anual. Esa fecha se guarda para el aÃ±o elegido y se aplica a las asignaciones cargadas para ese aÃ±o.</p>
+                        </div>
+                        <div id="yearParameterStatus" class="text-xs text-slate-300 bg-slate-900/60 border border-slate-700 rounded-xl p-3 min-w-[280px]">Sin parÃ¡metro anual cargado.</div>
+                    </div>
+                    <div class="parameter-grid">
+                        <div>
+                            <label class="field-label" for="assignmentYearInput">AÃ±o de asignaciÃ³n</label>
+                            <input id="assignmentYearInput" type="number" min="2020" max="2100" class="input-control" placeholder="2026">
+                            <div class="field-help">AÃ±o al que corresponde la capacitaciÃ³n.</div>
+                        </div>
+                        <div>
+                            <label class="field-label" for="assignmentDueDateInput">Fecha de vencimiento anual</label>
+                            <input id="assignmentDueDateInput" type="date" class="input-control date-input-strong">
+                            <div class="field-help">SeleccionÃ¡ dÃ­a, mes y aÃ±o desde el calendario.</div>
+                        </div>
+                        <div>
+                            <label class="field-label" for="assignmentWarningDaysInput">Alerta previa</label>
+                            <input id="assignmentWarningDaysInput" type="number" min="1" max="180" value="30" class="input-control">
+                            <div class="field-help">DÃ­as antes del vencimiento.</div>
+                        </div>
+                        <div class="flex flex-col gap-3">
+                            <label class="flex items-center gap-2 text-sm text-slate-300 whitespace-nowrap"><input id="assignmentMandatoryInput" type="checkbox" checked><span>Cursos obligatorios</span></label>
+                            <button id="saveYearParametersBtn" class="btn-primary whitespace-nowrap">Guardar vencimiento</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
+                    <div class="xl:col-span-1 space-y-5">
+                        <div class="mini-card">
+                            <h4 class="font-black text-white mb-3">2. Excel de consultores</h4>
+                            <p class="text-sm text-slate-400 mb-3">Columnas permitidas: <b>Nombre</b>, <b>Apellido</b>, <b>Email</b>. TambiÃ©n acepta: name, surname, email.</p>
+                            <div class="flex flex-wrap gap-2">
+                                <button id="downloadAssignmentsTemplateBtn" class="btn-secondary">Descargar template</button>
+                                <label class="btn-primary cursor-pointer">Subir Excel<input id="assignmentsFileInput" type="file" accept=".xlsx,.xls,.csv" class="hidden"></label>
+                            </div>
+                            <div id="fileNameLabel" class="text-sm text-slate-400 mt-3">Sin archivo cargado</div>
+                        </div>
+                        <div class="mini-card">
+                            <h4 class="font-black text-white mb-2">Resumen proyectado</h4>
+                            <div class="grid grid-cols-2 gap-3 text-center">
+                                <div class="bg-slate-900/60 rounded-xl p-3"><div id="summaryConsultants" class="text-2xl font-black">0</div><div class="text-xs text-slate-400">Consultores vÃ¡lidos</div></div>
+                                <div class="bg-slate-900/60 rounded-xl p-3"><div id="summaryCourses" class="text-2xl font-black">0</div><div class="text-xs text-slate-400">Cursos marcados</div></div>
+                                <div class="bg-slate-900/60 rounded-xl p-3"><div id="summaryAssignments" class="text-2xl font-black text-amber-300">0</div><div class="text-xs text-slate-400">Registros a subir</div></div>
+                                <div class="bg-slate-900/60 rounded-xl p-3"><div id="summaryErrors" class="text-2xl font-black text-red-300">0</div><div class="text-xs text-slate-400">Errores</div></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="xl:col-span-2 space-y-5">
+                        <div class="mini-card">
+                            <div class="flex flex-col md:flex-row md:items-end justify-between gap-3 mb-3">
+                                <div><h4 class="font-black text-white">3. Elegir cursos desde Supabase</h4><p class="text-sm text-slate-400">Lista oficial cargada automÃ¡ticamente desde <b>courses_unique</b>.</p></div>
+                                <div class="flex gap-2"><button id="selectAllCoursesBtn" class="btn-secondary">Marcar todos</button><button id="clearCoursesBtn" class="btn-secondary">Limpiar</button></div>
+                            </div>
+                            <input id="courseSearchInput" class="input-control mb-3" placeholder="Buscar curso...">
+                            <div class="preview-wrap max-h-[260px]">
+                                <table class="min-w-full"><thead class="table-header"><tr><th class="py-2 px-3 text-center w-16">Sel.</th><th class="py-2 px-3 text-left">Curso</th><th class="py-2 px-3 text-left">course_key</th></tr></thead><tbody id="coursesPickerTableBody" class="text-sm text-slate-300"></tbody></table>
+                            </div>
+                        </div>
+                        <div class="mini-card">
+                            <div class="flex flex-col lg:flex-row justify-between gap-3 mb-3">
+                                <div><h4 class="font-black text-white">4. PrevisualizaciÃ³n exacta de carga a course_assignments</h4><p id="importPreviewSummary" class="text-sm text-slate-400">Sin archivo cargado</p></div>
+                                <button id="confirmAssignmentsImportBtn" class="btn-primary disabled:opacity-40" disabled>Subir a Base de Datos</button>
+                            </div>
+                            <div class="preview-wrap">
+                                <table class="min-w-full text-xs"><thead class="table-header"><tr><th class="py-2 px-3 text-center">AÃ±o</th><th class="py-2 px-3 text-left">Curso</th><th class="py-2 px-3 text-left">Email</th><th class="py-2 px-3 text-left">Nombre</th><th class="py-2 px-3 text-left">Apellido</th><th class="py-2 px-3 text-center">Oblig.</th><th class="py-2 px-3 text-left">Vence</th><th class="py-2 px-3 text-left">Batch</th><th class="py-2 px-3 text-center">ValidaciÃ³n</th></tr></thead><tbody id="importPreviewTableBody" class="text-slate-300"></tbody></table>
+                            </div>
+                        </div>
+                        <div class="mini-card">
+                            <div class="flex justify-between items-center mb-2"><h4 class="font-black text-white">Log de cargas</h4><button id="clearImportLogBtn" class="text-xs text-slate-400 hover:text-white">Limpiar log local</button></div>
+                            <div id="importLogContainer" class="log-wrap text-sm text-slate-300 space-y-2"><div class="text-slate-500">Sin cargas registradas en esta estaciÃ³n.</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+const SUPABASE_URL = 'https://zaxyokejvwupwmbhenso.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpheHlva2Vqdnd1cHdtYmhlbnNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI4NzMwNDYsImV4cCI6MjA2ODQ0OTA0Nn0.boNwgjYadjo6deO_YfKbLCGt0ug4H012D2KuhX0WZB8';
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const els = {
+  hamburgerMenuBtn: document.getElementById('hamburgerMenuBtn'), actionsDropdown: document.getElementById('actionsDropdown'),
+  importAssignmentsBtn: document.getElementById('importAssignmentsBtn'), settingsBtn: document.getElementById('settingsBtn'), exportCSV: document.getElementById('exportCSV'), exportPDF: document.getElementById('exportPDF'),
+  courseFilter: document.getElementById('courseFilter'), yearFilter: document.getElementById('yearFilter'), resetFilters: document.getElementById('resetFilters'),
+  totalParticipants: document.getElementById('totalParticipants'), totalCourses: document.getElementById('totalCourses'), approvalRate: document.getElementById('approvalRate'), averageScore: document.getElementById('averageScore'), heroCurrentYear: document.getElementById('heroCurrentYear'), heroDataSource: document.getElementById('heroDataSource'),
+  usersTableBody: document.getElementById('usersTableBody'), showingFrom: document.getElementById('showingFrom'), showingTo: document.getElementById('showingTo'), totalRecords: document.getElementById('totalRecords'), currentPage: document.getElementById('currentPage'), prevPage: document.getElementById('prevPage'), nextPage: document.getElementById('nextPage'),
+  annualSummaryCards: document.getElementById('annualSummaryCards'), annualComplianceHead: document.getElementById('annualComplianceHead'), annualComplianceBody: document.getElementById('annualComplianceBody'), notificationContainer: document.getElementById('notificationContainer'),
+  settingsModal: document.getElementById('settingsModal'), closeSettings: document.getElementById('closeSettings'), saveSettings: document.getElementById('saveSettings'), resetSettings: document.getElementById('resetSettings'),
+  assignmentsModal: document.getElementById('assignmentsModal'), closeAssignmentsModalBtn: document.getElementById('closeAssignmentsModalBtn'), assignmentYearInput: document.getElementById('assignmentYearInput'), assignmentDueDateInput: document.getElementById('assignmentDueDateInput'), assignmentMandatoryInput: document.getElementById('assignmentMandatoryInput'),
+  downloadAssignmentsTemplateBtn: document.getElementById('downloadAssignmentsTemplateBtn'), assignmentsFileInput: document.getElementById('assignmentsFileInput'), fileNameLabel: document.getElementById('fileNameLabel'),
+  courseSearchInput: document.getElementById('courseSearchInput'), selectAllCoursesBtn: document.getElementById('selectAllCoursesBtn'), clearCoursesBtn: document.getElementById('clearCoursesBtn'), coursesPickerTableBody: document.getElementById('coursesPickerTableBody'),
+  importPreviewSummary: document.getElementById('importPreviewSummary'), importPreviewTableBody: document.getElementById('importPreviewTableBody'), confirmAssignmentsImportBtn: document.getElementById('confirmAssignmentsImportBtn'),
+  summaryConsultants: document.getElementById('summaryConsultants'), summaryCourses: document.getElementById('summaryCourses'), summaryAssignments: document.getElementById('summaryAssignments'), summaryErrors: document.getElementById('summaryErrors'), importLogContainer: document.getElementById('importLogContainer'), clearImportLogBtn: document.getElementById('clearImportLogBtn'),
+  assignmentWarningDaysInput: document.getElementById('assignmentWarningDaysInput'), saveYearParametersBtn: document.getElementById('saveYearParametersBtn'), yearParameterStatus: document.getElementById('yearParameterStatus')
+};
+
+let allUsersData = [];
+let coursesList = [];
+let chartInstances = {};
+let currentPage = 1;
+const recordsPerPage = 10;
+let selectedCourseKeys = new Set();
+let pendingConsultants = [];
+let pendingAssignments = [];
+let lastSourceBatch = '';
+let yearSettingsCache = new Map();
+const DEFAULT_WARNING_DAYS = 30;
+
+function normalizeText(s){ return String(s || '').normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase(); }
+function normalizeHeaderKey(s){ return normalizeText(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,''); }
+function escapeHtml(value){ return String(value ?? '').replace(/[&<>'"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m])); }
+function isValidEmail(email){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim()); }
+function getCourseDisplay(key, fallback){ const c = coursesList.find(x => x.course_key === key); return c ? c.display_name : (fallback || key || 'N/A'); }
+function statusOf(user){ if(user.training_status) return user.training_status; if(user.approved) return 'Aprobado'; if(user.quiz_score !== null && user.quiz_score !== undefined) return 'Reprobado'; return user.progress !== null && user.progress !== undefined ? 'En progreso' : 'No iniciado'; }
+function parseDateOnly(value){
+  if(!value) return null;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(String(value))) {
+    const [y,m,d] = String(value).split('-').map(Number);
+    return new Date(y, m-1, d);
+  }
+  if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(String(value))) {
+    const [d,m,y] = String(value).split('/').map(Number);
+    return new Date(y, m-1, d);
+  }
+  const dt = new Date(value);
+  return isNaN(dt) ? null : dt;
+}
+function daysUntil(value){
+  const d = parseDateOnly(value);
+  if(!d) return null;
+  const today = new Date(); today.setHours(0,0,0,0);
+  d.setHours(0,0,0,0);
+  return Math.ceil((d - today) / 86400000);
+}
+function getYearSetting(year){ return yearSettingsCache.get(String(year || '')) || {}; }
+function getWarningDaysForYear(year){ const s = getYearSetting(year); const n = Number(s.warning_days); return Number.isFinite(n) && n > 0 ? n : DEFAULT_WARNING_DAYS; }
+function dueStateOf(user){
+  if(statusOf(user) === 'Aprobado') return { code:'fulfilled', label:'Cumplido', cls:'status-ok', detail:'' };
+  if(!user.due_date) return { code:'no_due', label:'Sin vencimiento', cls:'status-neutral', detail:'' };
+  const days = daysUntil(user.due_date);
+  const warn = getWarningDaysForYear(user.course_year); // siempre dinÃ¡mico desde training_year_parameters
+  if(days === null) return { code:'invalid_due', label:'Vencimiento invÃ¡lido', cls:'status-risk', detail:'' };
+  if(days < 0) return { code:'overdue', label:'Vencido', cls:'status-risk', detail:`Hace ${Math.abs(days)} dÃ­as` };
+  if(days <= warn) return { code:'soon', label:'PrÃ³ximo a vencer', cls:'status-warn', detail:`Faltan ${days} dÃ­as` };
+  return { code:'on_time', label:'En plazo', cls:'status-neutral', detail:`Faltan ${days} dÃ­as` };
+}
+function getCurrentViewData(){
+  const course = els.courseFilter.value;
+  const year = els.yearFilter.value;
+  return allUsersData.filter(u => (course === 'all' || u.course_key === course) && (year === 'all' || String(u.course_year || '') === year));
+}
+function showNotification(message, type='success', duration=5000){
+  const n = document.createElement('div');
+  n.className = `notification notification-${type}`;
+  n.innerHTML = `<div class="flex items-start gap-3"><div class="font-semibold flex-1">${escapeHtml(message)}</div><button class="font-black text-lg leading-none">Ã—</button></div>`;
+  n.querySelector('button').onclick = () => n.remove();
+  els.notificationContainer.appendChild(n);
+  setTimeout(() => n.remove(), duration);
+}
+
+async function initializeDashboard(){
+  try {
+    await loadCourses();
+    await loadAllYearParameters();
+    await loadDashboardData();
+    populateFilters();
+    applySavedSettings();
+    updateDashboard();
+    renderImportLog();
+  } catch (error) {
+    console.error(error);
+    showNotification('No se pudieron cargar los datos del dashboard. RevisÃ¡ consola y permisos de Supabase.', 'error', 10000);
+  }
+}
+
+async function loadCourses(){
+  const { data, error } = await supabaseClient.from('courses_unique').select('display_name, course_key').order('display_name', { ascending: true });
+  if (!error && data && data.length) {
+    coursesList = data.filter(c => c.display_name && c.course_key).map(c => ({ display_name: c.display_name, course_key: c.course_key }));
+    return;
+  }
+
+  console.warn('No se pudo leer courses_unique. Se intenta armar cursos desde users_progress.', error);
+  const fallback = await supabaseClient.from('users_progress').select('course_title');
+  if (fallback.error) throw (error || fallback.error);
+  const map = new Map();
+  (fallback.data || []).forEach(r => {
+    const key = normalizeText(r.course_title);
+    if (key && !map.has(key)) map.set(key, { display_name: r.course_title, course_key: key });
+  });
+  coursesList = Array.from(map.values()).sort((a,b)=>a.display_name.localeCompare(b.display_name));
+}
+
+async function loadAllYearParameters(){
+  try {
+    const { data, error } = await supabaseClient.from('training_year_parameters').select('course_year, due_date, warning_days');
+    if (error) { console.warn('No se pudo leer training_year_parameters:', error); return; }
+    yearSettingsCache = new Map((data || []).map(r => [String(r.course_year), r]));
+  } catch (error) {
+    console.warn('training_year_parameters no disponible:', error);
+  }
+}
+async function loadAssignmentYearParameter(year){
+  if(!year) return;
+  if(!yearSettingsCache.has(String(year))) await loadAllYearParameters();
+  const setting = getYearSetting(year);
+  if(setting && setting.due_date){
+    els.assignmentDueDateInput.value = setting.due_date;
+    els.assignmentWarningDaysInput.value = setting.warning_days || DEFAULT_WARNING_DAYS;
+    els.yearParameterStatus.textContent = `ParÃ¡metro ${year}: vence ${setting.due_date} Â· alerta ${setting.warning_days || DEFAULT_WARNING_DAYS} dÃ­as antes.`;
+    els.yearParameterStatus.className = 'text-xs text-green-300 mt-3';
+  } else {
+    els.assignmentDueDateInput.value = '';
+    els.assignmentWarningDaysInput.value = DEFAULT_WARNING_DAYS;
+    els.yearParameterStatus.textContent = `Sin parÃ¡metro anual guardado para ${year}. DefinÃ­ vencimiento antes de subir asignaciones.`;
+    els.yearParameterStatus.className = 'text-xs text-amber-300 mt-3';
+  }
+  rebuildPreview();
+}
+async function saveAssignmentYearParameter(showOk=true){
+  const year = parseInt(els.assignmentYearInput.value, 10);
+  const dueDate = els.assignmentDueDateInput.value || '';
+  const warningDays = parseInt(els.assignmentWarningDaysInput.value || DEFAULT_WARNING_DAYS, 10);
+  if(!(year >= 2020 && year <= 2100)) throw new Error('AÃ±o invÃ¡lido para guardar parÃ¡metro.');
+  if(!dueDate) throw new Error('Debe informarse una fecha de vencimiento anual.');
+  if(!(warningDays >= 1 && warningDays <= 180)) throw new Error('La alerta previa debe estar entre 1 y 180 dÃ­as.');
+  const payload = { course_year: year, due_date: dueDate, warning_days: warningDays, updated_at: new Date().toISOString() };
+  const { error } = await supabaseClient.from('training_year_parameters').upsert(payload, { onConflict: 'course_year' });
+  if(error) throw error;
+
+  // El vencimiento anual manda sobre todas las asignaciones de ese aÃ±o.
+  // Al guardar el parÃ¡metro, tambiÃ©n se actualizan las asignaciones ya existentes.
+  const updateResp = await supabaseClient
+    .from('course_assignments')
+    .update({ due_date: dueDate, updated_at: new Date().toISOString() })
+    .eq('course_year', year);
+  if(updateResp.error) throw updateResp.error;
+
+  yearSettingsCache.set(String(year), payload);
+
+  // Actualiza en memoria para que el dashboard cambie de color/estado de inmediato
+  // sin tener que recargar la pÃ¡gina.
+  allUsersData.forEach(row => {
+    if (String(row.course_year || '') === String(year)) {
+      row.due_date = dueDate;
+      row.warning_days = null;
+    }
+  });
+
+  els.yearParameterStatus.textContent = `ParÃ¡metro guardado: aÃ±o ${year}, vencimiento ${dueDate}, alerta ${warningDays} dÃ­as antes.`;
+  els.yearParameterStatus.className = 'text-xs text-green-300 mt-3';
+  updateDashboard();
+  if(showOk) showNotification(`ParÃ¡metro anual ${year} guardado correctamente. Estados y colores recalculados.`, 'success');
+  return payload;
+}
+
+function normalizeDashboardRow(u, source){
+  const normalized = {
+    ...u,
+    course_key: u.course_key || normalizeText(u.course_title),
+    course_year: u.course_year || (u.completed_date ? extractYear(u.completed_date) : new Date().getFullYear()),
+    full_name: u.full_name || `${u.name || ''} ${u.surname || ''}`.trim(),
+    data_source: source
+  };
+  normalized.warning_days = u.warning_days != null ? Number(u.warning_days) : null;
+  normalized.training_status = statusOf(normalized);
+  return normalized;
+}
+
+function dashboardMergeKey(u){
+  return `${normalizeText(u.email)}|${u.course_key || normalizeText(u.course_title)}|${u.course_year || ''}`;
+}
+
+async function loadDashboardData(){
+  const [progressResp, complianceResp] = await Promise.all([
+    supabaseClient.from('users_progress').select('*'),
+    supabaseClient.from('training_compliance_dashboard').select('*')
+  ]);
+
+  if (progressResp.error && complianceResp.error) {
+    throw progressResp.error;
+  }
+
+  const merged = new Map();
+  (progressResp.data || []).map(u => normalizeDashboardRow(u, 'users_progress')).forEach(u => {
+    const key = dashboardMergeKey(u);
+    if (key) merged.set(key, u);
+  });
+
+  (complianceResp.data || []).map(u => normalizeDashboardRow(u, 'training_compliance_dashboard')).forEach(u => {
+    const key = dashboardMergeKey(u);
+    if (key) merged.set(key, u);
+  });
+
+  allUsersData = Array.from(merged.values());
+
+  if (!allUsersData.length && complianceResp.error) {
+    showNotification('El dashboard no pudo leer training_compliance_dashboard. Se intentÃ³ usar users_progress como respaldo.', 'warning', 9000);
+  }
+  if (progressResp.error) {
+    console.warn('No se pudo leer users_progress:', progressResp.error);
+  }
+  if (complianceResp.error) {
+    console.warn('No se pudo leer training_compliance_dashboard:', complianceResp.error);
+  }
+
+  const courseMap = new Map(coursesList.map(c => [c.course_key, c]));
+  allUsersData.forEach(u => {
+    if (u.course_key && !courseMap.has(u.course_key)) {
+      courseMap.set(u.course_key, { display_name: u.course_title || u.course_key, course_key: u.course_key });
+    }
+  });
+  coursesList = Array.from(courseMap.values()).sort((a,b)=>a.display_name.localeCompare(b.display_name));
+
+  if (els.heroCurrentYear) els.heroCurrentYear.textContent = String(new Date().getFullYear());
+  if (els.heroDataSource) {
+    const hasAssignments = (complianceResp.data || []).length > 0;
+    els.heroDataSource.textContent = hasAssignments ? 'Asignaciones' : 'Progreso';
+  }
+}
+
+function extractYear(dateValue){
+  if (!dateValue) return '';
+  const m = String(dateValue).match(/(20\d{2})/);
+  if (m) return Number(m[1]);
+  const d = new Date(dateValue);
+  return isNaN(d) ? '' : d.getFullYear();
+}
+function populateFilters(){
+  const selectedCourse = els.courseFilter.value || 'all';
+  const selectedYear = els.yearFilter.value || 'all';
+  els.courseFilter.innerHTML = '<option value="all">Todos los Cursos</option>';
+  coursesList.forEach(c => {
+    const o = document.createElement('option'); o.value = c.course_key; o.textContent = c.display_name; els.courseFilter.appendChild(o);
+  });
+  if ([...els.courseFilter.options].some(o => o.value === selectedCourse)) els.courseFilter.value = selectedCourse;
+  const years = [...new Set([...allUsersData.map(u => u.course_year), new Date().getFullYear()].filter(Boolean).map(String))].sort((a,b)=>Number(b)-Number(a));
+  els.yearFilter.innerHTML = '<option value="all">Todos los AÃ±os</option>';
+  years.forEach(y => { const o = document.createElement('option'); o.value = y; o.textContent = y; els.yearFilter.appendChild(o); });
+  if ([...els.yearFilter.options].some(o => o.value === selectedYear)) els.yearFilter.value = selectedYear;
+}
+function updateDashboard(resetPage=true){
+  if (resetPage) currentPage = 1;
+  const data = getCurrentViewData();
+  renderKPIs(data); renderAnnualCompliance(); renderYearCourseComparison(); renderUsersTable(data); renderCharts();
+}
+function renderKPIs(data){
+  const participants = new Set(data.map(u => normalizeText(u.email)).filter(Boolean));
+  const courses = new Set(data.map(u => u.course_key).filter(Boolean));
+  const approved = data.filter(u => statusOf(u) === 'Aprobado').length;
+  const assigned = data.length;
+  const scored = data.filter(u => typeof u.quiz_score === 'number');
+  const avg = scored.length ? scored.reduce((a,u)=>a+Number(u.quiz_score || 0),0)/scored.length : 0;
+  els.totalParticipants.textContent = participants.size;
+  els.totalCourses.textContent = courses.size || (els.courseFilter.value === 'all' ? coursesList.length : 0);
+  els.approvalRate.textContent = assigned ? `${((approved/assigned)*100).toFixed(1)}%` : '0%';
+  els.averageScore.textContent = avg.toFixed(1);
+}
+function renderAnnualCompliance(){
+  // La vista ejecutiva debe respetar exactamente los filtros de curso y aÃ±o.
+  // Antes se filtraba solo por curso y por eso, al elegir 2026, seguÃ­a mostrando 2025.
+  const base = getCurrentViewData();
+  const selectedYear = els.yearFilter.value;
+  const years = [...new Set(base.map(u => u.course_year).filter(Boolean).map(String))].sort((a,b)=>Number(a)-Number(b));
+  const courseKeys = [...new Set(base.map(u => u.course_key).filter(Boolean))].sort((a,b)=>getCourseDisplay(a).localeCompare(getCourseDisplay(b)));
+
+  const assigned = base.length;
+  const consultants = new Set(base.map(u => normalizeText(u.email)).filter(Boolean)).size;
+  const completed = base.filter(u => u.quiz_score !== null && u.quiz_score !== undefined).length;
+  const approved = base.filter(u => statusOf(u)==='Aprobado').length;
+  const pending = Math.max(assigned - approved, 0);
+  const openOnTime = base.filter(u => dueStateOf(u).code === 'on_time').length;
+  const dueSoon = base.filter(u => dueStateOf(u).code === 'soon').length;
+  const overdue = base.filter(u => dueStateOf(u).code === 'overdue').length;
+  const completionRate = assigned ? (completed / assigned) * 100 : 0;
+  const complianceRate = assigned ? (approved / assigned) * 100 : 0;
+
+  els.annualSummaryCards.className = 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4 mb-5';
+  els.annualSummaryCards.innerHTML = [
+    ['Consultores', consultants, 'Personas asignadas'],
+    ['A realizar', assigned, 'Consultor x curso'],
+    ['Realizadas', completed, 'Con evaluaciÃ³n'],
+    ['Aprobadas', approved, 'Cumplidas'],
+    ['Pendientes', pending, 'No aprobadas'],
+    ['Abiertas', openOnTime, 'En plazo'],
+    ['PrÃ³ximas', dueSoon, 'Por vencer'],
+    ['Vencidas', overdue, 'Fuera de plazo'],
+    ['Cumplimiento', `${complianceRate.toFixed(1)}%`, 'Aprobadas / asignadas']
+  ].map(([label,value,sub]) => `
+    <div class="mini-card text-center">
+      <div class="text-3xl font-black">${value}</div>
+      <div class="text-xs text-slate-400 uppercase tracking-wider mt-1">${label}</div>
+      <div class="text-[11px] text-slate-500 mt-1">${sub}</div>
+    </div>
+  `).join('');
+
+  if (!years.length || !courseKeys.length) {
+    const yearLabel = selectedYear === 'all' ? 'los filtros seleccionados' : `el aÃ±o ${selectedYear}`;
+    els.annualComplianceHead.innerHTML = '';
+    els.annualComplianceBody.innerHTML = `<tr><td class="py-4 px-3 text-center text-slate-400">Sin datos para ${yearLabel}.</td></tr>`;
+    return;
+  }
+
+  els.annualComplianceHead.innerHTML = `<tr><th class="py-3 px-4 text-left">Curso</th>${years.map(y=>`<th class="py-3 px-4 text-center">${y}</th>`).join('')}</tr>`;
+  els.annualComplianceBody.innerHTML = courseKeys.map(k => {
+    const cells = years.map(y => {
+      const rows = base.filter(u => u.course_key === k && String(u.course_year) === y);
+      if (!rows.length) return '<td class="py-3 px-4 text-center"><span class="status-pill status-neutral">Sin datos</span></td>';
+      const ok = rows.filter(u => statusOf(u)==='Aprobado').length;
+      const done = rows.filter(u => u.quiz_score !== null && u.quiz_score !== undefined).length;
+      const total = rows.length;
+      const rate = total ? ok / total * 100 : 0;
+      const dueSoon = rows.filter(u => dueStateOf(u).code === 'soon').length;
+      const overdue = rows.filter(u => dueStateOf(u).code === 'overdue').length;
+      const openOnTime = rows.filter(u => dueStateOf(u).code === 'on_time').length;
+      let cls = 'status-neutral';
+      let label = 'En plazo';
+      if (ok === total) {
+        cls = 'status-ok';
+        label = 'Cumplido';
+      } else if (overdue > 0) {
+        cls = 'status-risk';
+        label = 'Vencido';
+      } else if (dueSoon > 0) {
+        cls = 'status-warn';
+        label = 'PrÃ³ximo a vencer';
+      } else if (openOnTime > 0) {
+        cls = 'status-neutral';
+        label = 'Abierto';
+      }
+      return `<td class="py-3 px-4 text-center"><span class="status-pill ${cls}">${label}</span><div class="text-xs text-slate-400 mt-1">${rate.toFixed(0)}% (${ok}/${total})</div><div class="text-[11px] text-slate-500">Realizadas: ${done}/${total}</div><div class="text-[11px] ${overdue ? 'text-red-300' : dueSoon ? 'text-amber-300' : 'text-slate-500'}">Vencidas: ${overdue} Â· PrÃ³x.: ${dueSoon}</div></td>`;
+    }).join('');
+    return `<tr class="table-row"><td class="py-3 px-4 font-semibold">${escapeHtml(getCourseDisplay(k))}</td>${cells}</tr>`;
+  }).join('');
+}
+
+function renderYearCourseComparison(){
+  const selectedCourse = els.courseFilter.value;
+  const base = allUsersData.filter(u => selectedCourse === 'all' || u.course_key === selectedCourse);
+  const years = [...new Set(base.map(u => u.course_year).filter(Boolean).map(String))].sort((a,b)=>Number(a)-Number(b));
+  const courseKeys = [...new Set(base.map(u => u.course_key).filter(Boolean))].sort((a,b)=>getCourseDisplay(a).localeCompare(getCourseDisplay(b)));
+  const head = document.getElementById('yearCourseComparisonHead');
+  const body = document.getElementById('yearCourseComparisonBody');
+  const foot = document.getElementById('yearCourseComparisonFoot');
+  if (!head || !body || !foot) return;
+
+  if (!years.length || !courseKeys.length) {
+    head.innerHTML = '';
+    body.innerHTML = '<tr><td class="py-4 px-4 text-center text-slate-400">Sin datos para comparar aÃ±os.</td></tr>';
+    foot.innerHTML = '';
+    return;
+  }
+
+  head.innerHTML = `<tr>
+    <th class="py-3 px-4 text-left min-w-[320px]">Curso</th>
+    ${years.map(y => `<th class="py-3 px-4 text-center min-w-[170px]">${escapeHtml(y)}<div class="text-[11px] normal-case text-slate-400 font-normal mt-1">Inscriptos / Aprobados</div></th>`).join('')}
+    <th class="py-3 px-4 text-center min-w-[150px]">Total</th>
+  </tr>`;
+
+  const totalsByYear = {};
+  years.forEach(y => totalsByYear[y] = { assigned: 0, approved: 0 });
+  let grandAssigned = 0;
+  let grandApproved = 0;
+
+  body.innerHTML = courseKeys.map(k => {
+    let rowAssigned = 0;
+    let rowApproved = 0;
+    const cells = years.map(y => {
+      const rows = base.filter(u => u.course_key === k && String(u.course_year || '') === y);
+      const assigned = rows.length;
+      const approved = rows.filter(u => statusOf(u) === 'Aprobado').length;
+      const rate = assigned ? (approved / assigned) * 100 : 0;
+      rowAssigned += assigned;
+      rowApproved += approved;
+      totalsByYear[y].assigned += assigned;
+      totalsByYear[y].approved += approved;
+      const overdue = rows.filter(u => dueStateOf(u).code === 'overdue').length;
+      const dueSoon = rows.filter(u => dueStateOf(u).code === 'soon').length;
+      let pillClass = 'status-neutral';
+      let pillLabel = 'Sin datos';
+      if (assigned > 0 && approved === assigned) {
+        pillClass = 'status-ok';
+        pillLabel = 'Cumplido';
+      } else if (assigned > 0 && overdue > 0) {
+        pillClass = 'status-risk';
+        pillLabel = 'Vencido';
+      } else if (assigned > 0 && dueSoon > 0) {
+        pillClass = 'status-warn';
+        pillLabel = 'PrÃ³ximo a vencer';
+      } else if (assigned > 0) {
+        pillClass = 'status-neutral';
+        pillLabel = 'Abierto';
+      }
+      return `<td class="py-3 px-4 text-center">
+        <div class="text-lg font-black text-white">${assigned} / ${approved}</div>
+        <div class="text-xs text-slate-400">${rate.toFixed(1)}% aprobados</div>
+        <span class="status-pill ${pillClass} mt-2 inline-flex">${pillLabel}</span>
+      </td>`;
+    }).join('');
+    grandAssigned += rowAssigned;
+    grandApproved += rowApproved;
+    const rowRate = rowAssigned ? (rowApproved / rowAssigned) * 100 : 0;
+    return `<tr class="table-row">
+      <td class="py-3 px-4 font-semibold">${escapeHtml(getCourseDisplay(k))}</td>
+      ${cells}
+      <td class="py-3 px-4 text-center">
+        <div class="text-lg font-black text-white">${rowAssigned} / ${rowApproved}</div>
+        <div class="text-xs text-slate-400">${rowRate.toFixed(1)}% aprobados</div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  const totalCells = years.map(y => {
+    const assigned = totalsByYear[y].assigned;
+    const approved = totalsByYear[y].approved;
+    const rate = assigned ? (approved / assigned) * 100 : 0;
+    return `<td class="py-3 px-4 text-center">
+      <div class="text-lg font-black text-white">${assigned} / ${approved}</div>
+      <div class="text-xs text-slate-400">${rate.toFixed(1)}% aprobados</div>
+    </td>`;
+  }).join('');
+  const grandRate = grandAssigned ? (grandApproved / grandAssigned) * 100 : 0;
+  foot.innerHTML = `<tr>
+    <td class="py-3 px-4">Total general</td>
+    ${totalCells}
+    <td class="py-3 px-4 text-center">
+      <div class="text-lg font-black text-white">${grandAssigned} / ${grandApproved}</div>
+      <div class="text-xs text-slate-400">${grandRate.toFixed(1)}% aprobados</div>
+    </td>
+  </tr>`;
+}
+
+function renderUsersTable(data){
+  const start = (currentPage-1)*recordsPerPage;
+  const pageRows = data.slice(start, start+recordsPerPage);
+  if (!pageRows.length) els.usersTableBody.innerHTML = '<tr><td colspan="7" class="text-center py-4 text-slate-400">No hay datos para los filtros seleccionados.</td></tr>';
+  else els.usersTableBody.innerHTML = pageRows.map(u => {
+    const st = statusOf(u);
+    const cls = st === 'Aprobado' ? 'status-ok' : st === 'Reprobado' ? 'status-risk' : st === 'En progreso' ? 'status-warn' : 'status-neutral';
+    const due = dueStateOf(u);
+    return `<tr class="table-row"><td class="py-3 px-5">${escapeHtml(u.full_name || `${u.name||''} ${u.surname||''}`.trim())}<div class="text-xs text-slate-500">${escapeHtml(u.email || '')}</div></td><td class="py-3 px-5">${escapeHtml(getCourseDisplay(u.course_key, u.course_title))}</td><td class="py-3 px-5 text-center">${escapeHtml(u.course_year || 'N/A')}</td><td class="py-3 px-5 text-center">${u.quiz_score !== null && u.quiz_score !== undefined ? Number(u.quiz_score).toFixed(1) : 'N/A'}</td><td class="py-3 px-5 text-center"><span class="status-pill ${cls}">${escapeHtml(st)}</span></td><td class="py-3 px-5"><span class="status-pill ${due.cls}">${escapeHtml(due.label)}</span><div class="text-xs text-slate-500 mt-1">${escapeHtml(u.due_date || 'N/A')}${due.detail ? ' Â· ' + escapeHtml(due.detail) : ''}</div></td><td class="py-3 px-5">${escapeHtml(u.completed_date || 'N/A')}</td></tr>`;
+  }).join('');
+  els.showingFrom.textContent = data.length ? start+1 : 0;
+  els.showingTo.textContent = Math.min(start+recordsPerPage, data.length);
+  els.totalRecords.textContent = data.length;
+  els.currentPage.textContent = currentPage;
+  els.prevPage.disabled = currentPage <= 1;
+  els.nextPage.disabled = start + recordsPerPage >= data.length;
+}
+function renderCharts(){ renderPerformanceChart(); renderStatusChart(); renderEvolutionChart(); renderApprovalTrendChart(); }
+function destroyChart(name){ if(chartInstances[name]) { chartInstances[name].destroy(); chartInstances[name] = null; } }
+function renderPerformanceChart(){
+  const data = getCurrentViewData(); const grouped = {};
+  data.forEach(u => { const k = u.course_key; if(!k) return; grouped[k] ||= {Aprobado:0, Reprobado:0, 'En progreso':0, 'No iniciado':0}; grouped[k][statusOf(u)] = (grouped[k][statusOf(u)] || 0)+1; });
+  const keys = Object.keys(grouped); destroyChart('performance');
+  chartInstances.performance = new Chart(document.getElementById('performanceByCourseChart'), { type:'bar', data:{ labels: keys.map(k=>getCourseDisplay(k)), datasets:[
+    {label:'Aprobados', data:keys.map(k=>grouped[k].Aprobado||0), backgroundColor:'rgba(74,222,128,.72)'},
+    {label:'Reprobados', data:keys.map(k=>grouped[k].Reprobado||0), backgroundColor:'rgba(239,68,68,.72)'},
+    {label:'En progreso', data:keys.map(k=>grouped[k]['En progreso']||0), backgroundColor:'rgba(251,191,36,.72)'},
+    {label:'No iniciado', data:keys.map(k=>grouped[k]['No iniciado']||0), backgroundColor:'rgba(148,163,184,.72)'}
+  ]}, options:{ responsive:true, maintainAspectRatio:false, scales:{x:{stacked:true,ticks:{color:'#e6f1ff'}},y:{stacked:true,beginAtZero:true,ticks:{color:'#e6f1ff'}}}, plugins:{legend:{labels:{color:'#e6f1ff'}}} } });
+}
+function renderStatusChart(){
+  const grouped = {'Aprobado':0,'Reprobado':0,'En progreso':0,'No iniciado':0}; getCurrentViewData().forEach(u=>grouped[statusOf(u)]++); destroyChart('status');
+  chartInstances.status = new Chart(document.getElementById('overallStatusChart'), { type:'doughnut', data:{ labels:Object.keys(grouped), datasets:[{ data:Object.values(grouped), backgroundColor:['rgba(74,222,128,.75)','rgba(239,68,68,.75)','rgba(251,191,36,.75)','rgba(148,163,184,.75)'], borderColor:'#0a192f', borderWidth:2 }]}, options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top', labels:{color:'#e6f1ff'}}} } });
+}
+function monthKeyFrom(value){ const y = extractYear(value); if(!y) return ''; if(/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(String(value))){ const [d,m,yr]=String(value).split('/'); return `${yr}-${String(m).padStart(2,'0')}`; } const dt = new Date(value); return isNaN(dt) ? `${y}-01` : `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`; }
+function renderEvolutionChart(){
+  const monthly = {}; getCurrentViewData().forEach(u=>{ const m = monthKeyFrom(u.completed_date || u.assigned_at || u.created_at); if(!m) return; monthly[m] ||= {assigned:0, completed:0}; monthly[m].assigned++; if(statusOf(u)==='Aprobado') monthly[m].completed++; }); const labels = Object.keys(monthly).sort(); destroyChart('evolution');
+  chartInstances.evolution = new Chart(document.getElementById('evolutionChart'), { type:'line', data:{ labels, datasets:[{label:'Asignaciones', data:labels.map(m=>monthly[m].assigned), borderColor:'rgba(96,165,250,1)', backgroundColor:'rgba(96,165,250,.12)', tension:.3, fill:true},{label:'Aprobadas', data:labels.map(m=>monthly[m].completed), borderColor:'rgba(74,222,128,1)', backgroundColor:'rgba(74,222,128,.12)', tension:.3, fill:true}]}, options:{ responsive:true, maintainAspectRatio:false, scales:{x:{ticks:{color:'#e6f1ff'}},y:{beginAtZero:true,ticks:{color:'#e6f1ff'}}}, plugins:{legend:{labels:{color:'#e6f1ff'}}} } });
+}
+function renderApprovalTrendChart(){
+  const monthly = {}; getCurrentViewData().forEach(u=>{ const m = monthKeyFrom(u.completed_date || u.assigned_at || u.created_at); if(!m) return; monthly[m] ||= {total:0, ok:0}; monthly[m].total++; if(statusOf(u)==='Aprobado') monthly[m].ok++; }); const labels = Object.keys(monthly).sort(); destroyChart('approval');
+  chartInstances.approval = new Chart(document.getElementById('approvalTrendChart'), { type:'line', data:{ labels, datasets:[{label:'Cumplimiento (%)', data:labels.map(m=>monthly[m].total ? monthly[m].ok/monthly[m].total*100 : 0), borderColor:'rgba(251,191,36,1)', backgroundColor:'rgba(251,191,36,.12)', tension:.3, fill:true}]}, options:{ responsive:true, maintainAspectRatio:false, scales:{x:{ticks:{color:'#e6f1ff'}},y:{beginAtZero:true,max:100,ticks:{color:'#e6f1ff', callback:v=>v+'%'}}}, plugins:{legend:{labels:{color:'#e6f1ff'}}} } });
+}
+
+async function openAssignmentsModal(){
+  els.actionsDropdown.classList.add('hidden');
+  els.assignmentYearInput.value = els.yearFilter.value !== 'all' ? els.yearFilter.value : new Date().getFullYear();
+  selectedCourseKeys = new Set(coursesList.map(c => c.course_key));
+  els.assignmentMandatoryInput.checked = true;
+  pendingConsultants = []; pendingAssignments = [];
+  els.fileNameLabel.textContent = 'Sin archivo cargado'; els.assignmentsFileInput.value = ''; els.courseSearchInput.value = '';
+  renderCoursesPickerTable(); renderImportLog();
+  els.assignmentsModal.classList.remove('hidden');
+  await loadAssignmentYearParameter(els.assignmentYearInput.value);
+}
+function closeAssignmentsModal(){ els.assignmentsModal.classList.add('hidden'); }
+function renderCoursesPickerTable(){
+  const q = normalizeText(els.courseSearchInput.value);
+  const filtered = coursesList.filter(c => !q || normalizeText(c.display_name).includes(q) || normalizeText(c.course_key).includes(q));
+  if (!filtered.length) { els.coursesPickerTableBody.innerHTML = '<tr><td colspan="3" class="py-4 text-center text-slate-400">No hay cursos en courses_unique.</td></tr>'; return; }
+  els.coursesPickerTableBody.innerHTML = filtered.map(c => `<tr class="course-row ${selectedCourseKeys.has(c.course_key) ? 'selected' : ''}"><td class="py-2 px-3 text-center"><input type="checkbox" class="course-pick" data-course-key="${escapeHtml(c.course_key)}" ${selectedCourseKeys.has(c.course_key) ? 'checked' : ''}></td><td class="py-2 px-3 font-semibold">${escapeHtml(c.display_name)}</td><td class="py-2 px-3 text-slate-500">${escapeHtml(c.course_key)}</td></tr>`).join('');
+  els.coursesPickerTableBody.querySelectorAll('.course-pick').forEach(cb => cb.addEventListener('change', e => { const key = e.target.dataset.courseKey; if(e.target.checked) selectedCourseKeys.add(key); else selectedCourseKeys.delete(key); renderCoursesPickerTable(); rebuildPreview(); }));
+}
+function selectAllCourses(){ selectedCourseKeys = new Set(coursesList.map(c => c.course_key)); renderCoursesPickerTable(); rebuildPreview(); }
+function clearCourses(){ selectedCourseKeys.clear(); renderCoursesPickerTable(); rebuildPreview(); }
+function getSelectedCourses(){ return coursesList.filter(c => selectedCourseKeys.has(c.course_key)); }
+function downloadAssignmentsTemplate(){
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Nombre','Apellido','Email'],['Juan','PÃ©rez','juan.perez@blatorh.com'],['Ana','GÃ³mez','ana.gomez@blatorh.com']]), 'Consultores');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['Instrucciones'],['Subir solo la hoja Consultores. No escribir cursos ni aÃ±o en el Excel.'],['Los cursos se marcan en el dashboard desde courses_unique.'],['El aÃ±o se elige en el dashboard.']]), 'Instrucciones');
+  XLSX.writeFile(wb, `template_consultores_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+function readAssignmentsFile(file){
+  els.fileNameLabel.textContent = file.name;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const sheetName = wb.SheetNames.find(n => normalizeHeaderKey(n) === 'consultores') || wb.SheetNames[0];
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: '' });
+      const seen = new Set();
+      pendingConsultants = rows.map((raw, idx) => {
+        const n = {}; Object.keys(raw).forEach(k => n[normalizeHeaderKey(k)] = raw[k]);
+        const name = String(n.nombre ?? n.name ?? '').trim();
+        const surname = String(n.apellido ?? n.surname ?? '').trim();
+        const email = String(n.email ?? n.mail ?? n.correo ?? n.correo_electronico ?? '').trim().toLowerCase();
+        const errors = [];
+        if(!name) errors.push('Falta nombre'); if(!surname) errors.push('Falta apellido'); if(!email) errors.push('Falta email'); else if(!isValidEmail(email)) errors.push('Email invÃ¡lido'); if(email && seen.has(email)) errors.push('Duplicado en Excel'); if(email) seen.add(email);
+        return { rowNumber: idx+2, name, surname, email, errors, valid: errors.length === 0 };
+      }).filter(r => r.name || r.surname || r.email);
+      rebuildPreview();
+    } catch (error) { console.error(error); showNotification('No se pudo leer el Excel. Debe contener Nombre, Apellido y Email.', 'error'); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+function rebuildPreview(){
+  const year = parseInt(els.assignmentYearInput.value, 10);
+  const dueDate = els.assignmentDueDateInput.value || null;
+  const warningDays = parseInt(els.assignmentWarningDaysInput.value || DEFAULT_WARNING_DAYS, 10);
+  const mandatory = !!els.assignmentMandatoryInput.checked;
+  const selected = getSelectedCourses();
+  const valid = pendingConsultants.filter(c => c.valid);
+  const invalid = pendingConsultants.length - valid.length;
+  lastSourceBatch = `import_${year || 'sin_anio'}_${new Date().toISOString().replace(/[-:.TZ]/g,'').slice(0,14)}`;
+  pendingAssignments = [];
+  valid.forEach(c => selected.forEach(course => pendingAssignments.push({ course_year: year, course_title: course.display_name, email: c.email, name: c.name, surname: c.surname, mandatory, due_date: dueDate, active: true, source_batch: lastSourceBatch, notes: null })));
+  els.summaryConsultants.textContent = valid.length; els.summaryCourses.textContent = selected.length; els.summaryAssignments.textContent = pendingAssignments.length; els.summaryErrors.textContent = invalid;
+  const yearValid = year >= 2020 && year <= 2100;
+  const dueValid = !!dueDate;
+  const warnValid = warningDays >= 1 && warningDays <= 180;
+  els.importPreviewSummary.textContent = `${valid.length} consultores vÃ¡lidos / ${selected.length} cursos marcados / ${pendingAssignments.length} registros a cargar en course_assignments / AÃ±o ${year || 'sin definir'} / Vence ${dueDate || 'sin definir'}`;
+  els.confirmAssignmentsImportBtn.disabled = !(yearValid && dueValid && warnValid && valid.length && selected.length && pendingAssignments.length && invalid === 0);
+  renderImportPreviewTable();
+}
+function renderImportPreviewTable(){
+  if (!pendingConsultants.length) { els.importPreviewTableBody.innerHTML = '<tr><td colspan="9" class="py-4 text-center text-slate-400">SubÃ­ un Excel de consultores para previsualizar la carga.</td></tr>'; return; }
+  if (!pendingAssignments.length) {
+    const invalidRows = pendingConsultants.filter(c => !c.valid).map(c => `<tr><td colspan="2" class="py-2 px-3">Fila ${c.rowNumber}</td><td class="py-2 px-3">${escapeHtml(c.email || 'N/A')}</td><td class="py-2 px-3">${escapeHtml(c.name || 'N/A')}</td><td class="py-2 px-3">${escapeHtml(c.surname || 'N/A')}</td><td colspan="4" class="py-2 px-3 text-red-300">${escapeHtml(c.errors.join(', '))}</td></tr>`).join('');
+    els.importPreviewTableBody.innerHTML = invalidRows || '<tr><td colspan="9" class="py-4 text-center text-slate-400">MarcÃ¡ al menos un curso para ver la carga proyectada.</td></tr>'; return;
+  }
+  els.importPreviewTableBody.innerHTML = pendingAssignments.slice(0, 1000).map(r => `<tr class="border-b border-slate-700"><td class="py-2 px-3 text-center">${escapeHtml(r.course_year)}</td><td class="py-2 px-3">${escapeHtml(r.course_title)}</td><td class="py-2 px-3">${escapeHtml(r.email)}</td><td class="py-2 px-3">${escapeHtml(r.name)}</td><td class="py-2 px-3">${escapeHtml(r.surname)}</td><td class="py-2 px-3 text-center">${r.mandatory ? 'SÃ­' : 'No'}</td><td class="py-2 px-3">${escapeHtml(r.due_date || 'N/A')}</td><td class="py-2 px-3">${escapeHtml(r.source_batch)}</td><td class="py-2 px-3 text-center"><span class="status-pill status-ok">OK</span></td></tr>`).join('') + (pendingAssignments.length > 1000 ? `<tr><td colspan="9" class="py-3 px-3 text-center text-amber-300">Vista limitada a 1000 registros. Se cargarÃ¡n ${pendingAssignments.length} registros.</td></tr>` : '');
+}
+async function confirmAssignmentsImport(){
+  rebuildPreview();
+  if (els.confirmAssignmentsImportBtn.disabled) { showNotification('La carga tiene errores, no tiene cursos marcados o no tiene consultores vÃ¡lidos.', 'warning'); return; }
+  els.confirmAssignmentsImportBtn.disabled = true; els.confirmAssignmentsImportBtn.textContent = 'Subiendo...';
+  const started = new Date().toISOString(); let inserted = 0;
+  const attempted = pendingAssignments.length;
+  try {
+    await saveAssignmentYearParameter(false);
+    for (let i=0; i<pendingAssignments.length; i+=200) {
+      const chunk = pendingAssignments.slice(i, i+200);
+      const { error } = await supabaseClient.from('course_assignments').upsert(chunk, { onConflict: 'email_key,course_key,course_year' });
+      if (error) throw error;
+      inserted += chunk.length;
+    }
+    addImportLog({ date: started, status: 'OK', batch: lastSourceBatch, consultants: pendingConsultants.filter(c=>c.valid).length, courses: getSelectedCourses().length, records: inserted, attempted, year: els.assignmentYearInput.value, due_date: els.assignmentDueDateInput.value, warning_days: els.assignmentWarningDaysInput.value });
+    showNotification(`Carga completada: ${inserted} registros subidos a course_assignments.`, 'success', 7000);
+    await loadDashboardData(); populateFilters(); updateDashboard(); renderImportLog();
+  } catch (error) {
+    console.error(error);
+    let msg = error.message || String(error);
+    if (msg.toLowerCase().includes('row-level security')) {
+      msg = 'Supabase bloqueÃ³ la carga por Row Level Security en course_assignments. EjecutÃ¡ el SQL de permisos/RLS indicado para habilitar INSERT/UPDATE desde el dashboard.';
+    }
+    addImportLog({ date: started, status: 'ERROR', batch: lastSourceBatch, consultants: pendingConsultants.filter(c=>c.valid).length, courses: getSelectedCourses().length, records: inserted, attempted, year: els.assignmentYearInput.value, due_date: els.assignmentDueDateInput.value, warning_days: els.assignmentWarningDaysInput.value, error: msg });
+    renderImportLog(); showNotification(`Error subiendo a Supabase: ${msg}`, 'error', 15000);
+  } finally { els.confirmAssignmentsImportBtn.textContent = 'Subir a Base de Datos'; rebuildPreview(); }
+}
+function getImportLogs(){ try { return JSON.parse(localStorage.getItem('blatorh_import_logs') || '[]'); } catch { return []; } }
+function addImportLog(log){ const logs = [log, ...getImportLogs()].slice(0,30); localStorage.setItem('blatorh_import_logs', JSON.stringify(logs)); }
+function renderImportLog(){ const logs = getImportLogs(); if(!logs.length){ els.importLogContainer.innerHTML = '<div class="text-slate-500">Sin cargas registradas en esta estaciÃ³n.</div>'; return; } els.importLogContainer.innerHTML = logs.map(l => `<div class="bg-slate-900/50 rounded-lg p-2 border border-slate-700"><div class="flex justify-between gap-3"><b class="${l.status==='OK'?'text-green-300':'text-red-300'}">${escapeHtml(l.status)}</b><span class="text-xs text-slate-500">${escapeHtml(new Date(l.date).toLocaleString('es-AR'))}</span></div><div class="text-xs text-slate-400 mt-1">AÃ±o ${escapeHtml(l.year)} Â· Vence ${escapeHtml(l.due_date || 'N/A')} Â· Alerta ${escapeHtml(l.warning_days || DEFAULT_WARNING_DAYS)} dÃ­as Â· ${escapeHtml(l.consultants)} consultores Â· ${escapeHtml(l.courses)} cursos Â· ${escapeHtml(l.records)} registros</div><div class="text-xs text-slate-500 break-all">Batch: ${escapeHtml(l.batch)}</div>${l.error ? `<div class="text-xs text-red-300 mt-1">${escapeHtml(l.error)}</div>` : ''}</div>`).join(''); }
+function clearImportLog(){ localStorage.removeItem('blatorh_import_logs'); renderImportLog(); }
+
+async function exportCsv() {
+  els.exportCSV.disabled = true;
+  const originalHtml = els.exportCSV.innerHTML;
+  els.exportCSV.innerHTML = '<span class="px-2">Generando...</span>';
+  try {
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'BlatoRH Group';
+    workbook.created = new Date();
+    const sheetResumen = workbook.addWorksheet('Resumen Ejecutivo');
+    sheetResumen.columns = [{ width: 25 }, { width: 20 }];
+    sheetResumen.addRow(['Dashboard de AnÃ¡lisis de Capacitaciones']).font = { bold: true, size: 16 };
+    sheetResumen.addRow([`Fecha de extracciÃ³n: ${new Date().toLocaleDateString('es-AR')}`]);
+    sheetResumen.addRow([`Filtro Curso: ${els.courseFilter.options[els.courseFilter.selectedIndex].text}`]);
+    sheetResumen.addRow([`Filtro AÃ±o: ${els.yearFilter.value}`]);
+    sheetResumen.addRow([]);
+    sheetResumen.addRow(['MÃ©tricas Generales']).font = { bold: true, size: 14 };
+    sheetResumen.addRow(['Total de Participantes:', els.totalParticipants.textContent]);
+    sheetResumen.addRow(['Total de Cursos:', els.totalCourses.textContent]);
+    sheetResumen.addRow(['Tasa de Cumplimiento:', els.approvalRate.textContent]);
+    sheetResumen.addRow(['Promedio CalificaciÃ³n:', els.averageScore.textContent]);
+    const sheetData = workbook.addWorksheet('Detalle de Capacitaciones');
+    sheetData.columns = [
+      { header: 'Nombre Completo', key: 'name', width: 30 },
+      { header: 'Email', key: 'email', width: 35 },
+      { header: 'Curso', key: 'course', width: 40 },
+      { header: 'AÃ±o', key: 'year', width: 10 },
+      { header: 'Score', key: 'score', width: 10 },
+      { header: 'Estado', key: 'status', width: 15 },
+      { header: 'Vencimiento', key: 'due', width: 15 },
+      { header: 'Estado Vencimiento', key: 'dueState', width: 20 },
+      { header: 'Fecha RealizaciÃ³n', key: 'date', width: 20 }
+    ];
+    sheetData.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    sheetData.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+    const data = getCurrentViewData();
+    data.forEach(u => {
+      const row = sheetData.addRow({
+        name: u.full_name || `${u.name||''} ${u.surname||''}`.trim(),
+        email: u.email || '',
+        course: getCourseDisplay(u.course_key, u.course_title),
+        year: u.course_year || '',
+        score: u.quiz_score !== null && u.quiz_score !== undefined ? Number(u.quiz_score).toFixed(1) : 'N/A',
+        status: statusOf(u),
+        due: u.due_date || 'N/A',
+        dueState: dueStateOf(u).label,
+        date: u.completed_date || 'N/A'
+      });
+      const statusCell = row.getCell('status');
+      if (statusCell.value === 'Aprobado') {
+        statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4ADE80' } };
+      } else if (statusCell.value === 'Reprobado') {
+        statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF87171' } };
+      } else if (statusCell.value === 'En progreso') {
+        statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFBBF24' } };
+      } else {
+        statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF94A3B8' } };
+      }
+      statusCell.font = { color: { argb: 'FF0F172A' }, bold: true };
+      const dueStateCode = dueStateOf(u).code;
+      const dueStateCell = row.getCell('dueState');
+      if (dueStateCode === 'overdue') {
+        dueStateCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF87171' } };
+      } else if (dueStateCode === 'soon') {
+        dueStateCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFBBF24' } };
+      } else if (dueStateCode === 'on_time') {
+        dueStateCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF94A3B8' } };
+      } else if (dueStateCode === 'fulfilled') {
+        dueStateCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4ADE80' } };
+      }
+      if(dueStateCode !== 'invalid_due' && dueStateCode !== 'no_due') {
+          dueStateCell.font = { color: { argb: 'FF0F172A' }, bold: true };
+      }
+    });
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `Reporte_Avanzado_${els.yearFilter.value}_${new Date().toISOString().slice(0,10)}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showNotification('Reporte Excel avanzado generado correctamente.', 'success');
+  } catch (error) {
+    console.error(error);
+    showNotification('Error al generar el Excel avanzado.', 'error');
+  } finally {
+    els.exportCSV.disabled = false;
+    els.exportCSV.innerHTML = originalHtml;
+  }
+}
+
+async function exportPdf() {
+  els.exportPDF.disabled = true;
+  const originalHtml = els.exportPDF.innerHTML;
+  els.exportPDF.innerHTML = '<span class="px-2">Generando...</span>';
+  try {
+    const { jsPDF } = window.jspdf; 
+    const doc = new jsPDF({orientation:'landscape'}); 
+    doc.setFillColor(15, 23, 42); 
+    doc.rect(0, 0, 300, 25, 'F');
+    doc.setTextColor(251, 191, 36); 
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text('BlatoRH Group', 14, 11);
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.text('Reporte Ejecutivo de Capacitaciones', 14, 19);
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    const selectedCourse = els.courseFilter.options[els.courseFilter.selectedIndex].text;
+    const selectedYear = els.yearFilter.value;
+    doc.text(`Curso: ${selectedCourse}`, 14, 33);
+    doc.text(`AÃ±o: ${selectedYear}`, 14, 38);
+    doc.text(`Fecha de Reporte: ${new Date().toLocaleDateString('es-AR')}`, 14, 43);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Participantes: ${els.totalParticipants.textContent}`, 140, 33);
+    doc.text(`Cumplimiento: ${els.approvalRate.textContent}`, 140, 38);
+    doc.text(`Cursos: ${els.totalCourses.textContent}`, 200, 33);
+    doc.text(`Promedio: ${els.averageScore.textContent}`, 200, 38);
+    doc.setFont("helvetica", "normal");
+    const data = getCurrentViewData();
+    doc.autoTable({ 
+        startY: 48, 
+        head:[['Nombre','Email','Curso','AÃ±o','Score','Estado','Fecha', 'Vencimiento']], 
+        body:data.map(u=>[
+            u.full_name || `${u.name||''} ${u.surname||''}`.trim(), 
+            u.email || '', 
+            getCourseDisplay(u.course_key,u.course_title), 
+            u.course_year || '', 
+            u.quiz_score !== null && u.quiz_score !== undefined ? Number(u.quiz_score).toFixed(1) : 'N/A', 
+            statusOf(u), 
+            u.completed_date || 'N/A',
+            u.due_date || 'N/A'
+        ]), 
+        styles:{fontSize:8}, 
+        headStyles:{fillColor:[15, 23, 42], textColor:[255,255,255], fontStyle: 'bold'},
+        alternateRowStyles: {fillColor: [241, 245, 249]},
+        didParseCell: function(data) {
+            if (data.section === 'body' && data.column.index === 5) {
+                const status = data.cell.raw;
+                if (status === 'Aprobado') {
+                    data.cell.styles.textColor = [22, 163, 74];
+                    data.cell.styles.fontStyle = 'bold';
+                } else if (status === 'Reprobado') {
+                    data.cell.styles.textColor = [220, 38, 38];
+                    data.cell.styles.fontStyle = 'bold';
+                } else if (status === 'En progreso') {
+                    data.cell.styles.textColor = [217, 119, 6];
+                    data.cell.styles.fontStyle = 'bold';
+                }
+            }
+        }
+    }); 
+    const chartElements = document.querySelectorAll('.chart-container canvas');
+    if(chartElements.length > 0) {
+        doc.addPage();
+        doc.setFillColor(15, 23, 42); 
+        doc.rect(0, 0, 300, 25, 'F');
+        doc.setTextColor(251, 191, 36); 
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text('BlatoRH Group - AnÃ¡lisis GrÃ¡fico', 14, 16);
+        try {
+            for(let i=0; i<Math.min(chartElements.length, 2); i++) {
+                const canvas = await html2canvas(chartElements[i], {scale: 2, backgroundColor: '#0a192f'});
+                const imgData = canvas.toDataURL('image/jpeg', 0.85);
+                const xOffset = i % 2 === 0 ? 14 : 154;
+                const yOffset = 35;
+                const width = 130;
+                const height = (canvas.height * width) / canvas.width;
+                doc.addImage(imgData, 'JPEG', xOffset, yOffset, width, height);
+            }
+        } catch (e) {
+            console.warn('Error capturando grÃ¡ficos para el PDF:', e);
+        }
+    }
+    doc.save(`Reporte_Ejecutivo_${selectedYear}_${new Date().toISOString().slice(0,10)}.pdf`); 
+    showNotification('Reporte PDF Ejecutivo generado correctamente.', 'success');
+  } catch (error) {
+    console.error(error);
+    showNotification('Error al generar PDF.', 'error');
+  } finally {
+    els.exportPDF.disabled = false;
+    els.exportPDF.innerHTML = originalHtml;
+  }
+}
+function applySavedSettings(){ const s = JSON.parse(localStorage.getItem('dashboardSettings') || 'null'); if(s) applySettings(s); }
+function applySettings(settings){ const kpis = document.getElementById('kpi-grid').children; kpis[0].style.display = settings.kpis.participants ? '' : 'none'; kpis[1].style.display = settings.kpis.courses ? '' : 'none'; kpis[2].style.display = settings.kpis.approval ? '' : 'none'; kpis[3].style.display = settings.kpis.score ? '' : 'none'; const charts = document.querySelectorAll('.chart-card'); charts[0].style.display = settings.charts.performance ? '' : 'none'; charts[1].style.display = settings.charts.status ? '' : 'none'; charts[2].style.display = settings.charts.evolution ? '' : 'none'; charts[3].style.display = settings.charts.approvalTrend ? '' : 'none'; }
+function openSettings(){ els.actionsDropdown.classList.add('hidden'); els.settingsModal.classList.remove('hidden'); }
+function saveSettings(){ const settings = { kpis:{ participants:document.getElementById('kpi-participants').checked, courses:document.getElementById('kpi-courses').checked, approval:document.getElementById('kpi-approval').checked, score:document.getElementById('kpi-score').checked }, charts:{ performance:document.getElementById('chart-performance').checked, status:document.getElementById('chart-status').checked, evolution:document.getElementById('chart-evolution').checked, approvalTrend:document.getElementById('chart-approval-trend').checked }}; localStorage.setItem('dashboardSettings', JSON.stringify(settings)); applySettings(settings); els.settingsModal.classList.add('hidden'); showNotification('ConfiguraciÃ³n guardada.', 'success'); }
+
+els.hamburgerMenuBtn.addEventListener('click', e => { e.stopPropagation(); els.actionsDropdown.classList.toggle('hidden'); });
+document.addEventListener('click', e => { if(!els.actionsDropdown.contains(e.target) && !els.hamburgerMenuBtn.contains(e.target)) els.actionsDropdown.classList.add('hidden'); });
+els.importAssignmentsBtn.addEventListener('click', openAssignmentsModal); els.settingsBtn.addEventListener('click', openSettings);
+els.exportCSV.addEventListener('click', exportCsv); els.exportPDF.addEventListener('click', exportPdf);
+els.courseFilter.addEventListener('change', () => updateDashboard(true)); els.yearFilter.addEventListener('change', () => updateDashboard(true)); els.resetFilters.addEventListener('click', () => { els.courseFilter.value='all'; els.yearFilter.value='all'; updateDashboard(true); });
+els.prevPage.addEventListener('click', () => { if(currentPage>1){ currentPage--; renderUsersTable(getCurrentViewData()); }}); els.nextPage.addEventListener('click', () => { const total = Math.ceil(getCurrentViewData().length/recordsPerPage); if(currentPage<total){ currentPage++; renderUsersTable(getCurrentViewData()); }});
+els.closeSettings.addEventListener('click', () => els.settingsModal.classList.add('hidden')); els.saveSettings.addEventListener('click', saveSettings); els.resetSettings.addEventListener('click', () => { ['kpi-participants','kpi-courses','kpi-approval','kpi-score','chart-performance','chart-status','chart-evolution','chart-approval-trend'].forEach(id=>document.getElementById(id).checked=true); });
+els.closeAssignmentsModalBtn.addEventListener('click', closeAssignmentsModal); els.downloadAssignmentsTemplateBtn.addEventListener('click', downloadAssignmentsTemplate); els.assignmentsFileInput.addEventListener('change', e => { const f=e.target.files && e.target.files[0]; if(f) readAssignmentsFile(f); });
+els.courseSearchInput.addEventListener('input', renderCoursesPickerTable); els.selectAllCoursesBtn.addEventListener('click', selectAllCourses); els.clearCoursesBtn.addEventListener('click', clearCourses); els.assignmentYearInput.addEventListener('change', () => loadAssignmentYearParameter(els.assignmentYearInput.value)); els.assignmentDueDateInput.addEventListener('change', rebuildPreview); els.assignmentWarningDaysInput.addEventListener('input', rebuildPreview); els.assignmentMandatoryInput.addEventListener('change', rebuildPreview); els.saveYearParametersBtn.addEventListener('click', async () => { try { await saveAssignmentYearParameter(true); rebuildPreview(); } catch(error) { showNotification(error.message || String(error), 'error', 10000); } }); els.confirmAssignmentsImportBtn.addEventListener('click', confirmAssignmentsImport); els.clearImportLogBtn.addEventListener('click', clearImportLog);
+document.addEventListener('DOMContentLoaded', initializeDashboard);
+</script>
+</body>
+</html>
+
+

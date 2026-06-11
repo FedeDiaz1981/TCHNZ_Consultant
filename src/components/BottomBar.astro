@@ -1,0 +1,14 @@
+﻿---
+import { bottomBar } from "../data/site";
+---
+
+<div class="bottom py-2 text-white">
+  <div class="mx-auto flex max-w-6xl flex-col gap-2 px-6 text-sm md:flex-row md:items-center md:justify-between">
+    <div>
+      <p>{bottomBar.credit} <p1> {bottomBar.brand}</p1></p>
+    </div>
+    <div>
+      <a href={bottomBar.link}><p>{bottomBar.linkLabel}</p></a>
+    </div>
+  </div>
+</div>

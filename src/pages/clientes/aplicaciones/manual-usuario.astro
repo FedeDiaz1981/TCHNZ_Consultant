@@ -1,0 +1,72 @@
+﻿---
+import PortalLayout from '../../../layouts/PortalLayout.astro';
+import ManualUsuarioContent from '../../../components/portal/ManualUsuarioContent.astro';
+import { getCurrentPortalClient } from '../../../lib/portal/client-access';
+import { getCustomerLocale } from '../../../lib/i18n/customers';
+import { getSectionHrefForPath } from '../../../lib/portal/hosts';
+import { moduleRequiresAuth } from '../../../lib/portal/modules';
+
+const user = Astro.locals.user;
+const supabase = Astro.locals.supabase;
+const portalModule = Astro.locals.portalModule;
+
+if (!supabase) {
+  return Astro.redirect('/consultant/login');
+}
+
+const requiresAuth = moduleRequiresAuth(portalModule);
+const currentClient =
+  requiresAuth && user ? await getCurrentPortalClient(supabase, user.id, portalModule) : null;
+const locale = getCustomerLocale(Astro.url, Astro.cookies);
+
+const manualUi = {
+  es: {
+    title: "Manual de Usuario",
+    description: "Manual de usuario y guia operativa para herramientas del consultor.",
+    back: "Volver al panel de reconversion",
+    badge: "Version 13.0 - Estable",
+    download: "Guardar guia",
+  },
+  en: {
+    title: "User Manual",
+    description: "User guide and operating manual for consultant tools.",
+    back: "Back to conversion panel",
+    badge: "Version 13.0 - Stable",
+    download: "Save guide",
+  }
+} as const;
+
+const ui = manualUi[locale] ?? manualUi.es;
+const reconversionHref = getSectionHrefForPath(Astro.url, '/clientes/aplicaciones/reconversion-archivo');
+---
+
+<PortalLayout
+  title={`${ui.title} | ${currentClient?.name ?? 'Technized'}`}
+  description={ui.description}
+  userEmail={user?.email ?? ''}
+  activePath="/clientes/aplicaciones"
+  clientName={currentClient?.name ?? ''}
+  clientLogoUrl={currentClient?.logoUrl ?? ''}
+  locale={locale}
+  portalModule={portalModule}
+>
+  <section class="portal-panel overflow-hidden rounded-[32px] p-0">
+    <ManualUsuarioContent locale={locale}>
+      <a slot="back" href={reconversionHref} class="manual-btn-outline">
+        <i data-lucide="arrow-left"></i>
+        {ui.back}
+      </a>
+
+      <span slot="badge" class="manual-badge-green">{ui.badge}</span>
+
+      <button slot="download" id="btnDownloadPage" type="button" class="manual-btn-premium">
+        <i data-lucide="download-cloud"></i>
+        {ui.download}
+      </button>
+    </ManualUsuarioContent>
+  </section>
+
+  <script is:inline src="https://unpkg.com/lucide@latest"></script>
+  <script is:inline src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script type="module" src="/consultant/scripts/manual-page.js"></script>
+</PortalLayout>

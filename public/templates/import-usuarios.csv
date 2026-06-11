@@ -1,0 +1,3 @@
+email,full_name,password,is_admin,client_slug,is_active
+ana@technized.com,Ana Perez,,false,cliente-demo,true
+admin@technized.com,Admin Portal,,true,,true

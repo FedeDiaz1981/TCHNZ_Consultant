@@ -1,0 +1,647 @@
+---
+import BaseLayout from "./BaseLayout.astro";
+import { getSectionHrefForPath } from "../lib/portal/hosts";
+import {
+  getModuleContentSection,
+  getPortalModuleConfig,
+  type PortalModule
+} from "../lib/portal/modules";
+
+const {
+  title = "Administracion | Portal",
+  description = "Modulo de administracion del portal de clientes",
+  userEmail = "",
+  activePath = "/admin",
+  portalModule = Astro.locals.portalModule ?? "customers"
+} = Astro.props;
+
+const currentModule = portalModule as PortalModule;
+const moduleConfig = getPortalModuleConfig(currentModule);
+const contentSection = getModuleContentSection(currentModule);
+const navItems = [
+  { href: getSectionHrefForPath(Astro.url, "/admin"), label: "Resumen", icon: "fa-chart-line", activeInternalPath: "/admin" },
+  {
+    href: getSectionHrefForPath(Astro.url, "/admin/clientes"),
+    label: moduleConfig.entity.plural.es,
+    icon: "fa-buildings",
+    activeInternalPath: "/admin/clientes"
+  },
+  { href: getSectionHrefForPath(Astro.url, "/admin/usuarios"), label: "Usuarios", icon: "fa-users", activeInternalPath: "/admin/usuarios" },
+  { href: getSectionHrefForPath(Astro.url, "/admin/aplicaciones"), label: "Aplicaciones", icon: "fa-layer-group", activeInternalPath: "/admin/aplicaciones" },
+  ...(contentSection
+    ? [
+        {
+          href: getSectionHrefForPath(Astro.url, "/admin/blog"),
+          label: contentSection === "training" ? "Training" : "Blog",
+          icon: "fa-newspaper",
+          activeInternalPath: "/admin/blog"
+        }
+      ]
+    : []),
+  { href: getSectionHrefForPath(Astro.url, "/admin/accesos"), label: "Accesos", icon: "fa-key", activeInternalPath: "/admin/accesos" }
+];
+
+const currentSection = navItems.find((item) => item.activeInternalPath === activePath)?.label ?? "Administracion";
+const portalClientHref = getSectionHrefForPath(Astro.url, "/clientes/aplicaciones");
+---
+
+<BaseLayout title={title} description={description}>
+  <section class="portal-shell admin-shell" data-sidebar-collapsed="false">
+    <div class="admin-shell__frame">
+      <aside class="admin-sidebar admin-sidebar--desktop hidden lg:flex">
+        <button
+          type="button"
+          class="admin-sidebar__toggle"
+          data-sidebar-toggle
+          aria-expanded="true"
+          aria-label="Plegar menu lateral"
+        >
+          <i class="fa-solid fa-panel-left" aria-hidden="true"></i>
+        </button>
+
+        <div class="admin-sidebar__brand">
+          <p class="portal-eyebrow text-[11px]">Technized</p>
+          <h1 class="admin-sidebar__title">Control interno</h1>
+          <p class="portal-copy text-sm">
+            Consola de operacion del modulo {moduleConfig.name.es} para entidades, usuarios, aplicaciones y accesos.
+          </p>
+        </div>
+
+        <nav class="admin-sidebar__nav">
+          {navItems.map((item) => (
+            <a
+              href={item.href}
+              class:list={[
+                "admin-sidebar__link",
+                activePath === item.activeInternalPath && "is-active"
+              ]}
+              title={item.label}
+            >
+              <span class="admin-sidebar__icon">
+                <i class:list={["fa-solid", item.icon]} aria-hidden="true"></i>
+              </span>
+              <span class="admin-sidebar__label">{item.label}</span>
+            </a>
+          ))}
+        </nav>
+
+        <div class="admin-sidebar__footer">
+          <div class="admin-sidebar__user">
+            <span class="admin-sidebar__user-dot"></span>
+            <div class="min-w-0 admin-sidebar__user-copy">
+              <p class="text-xs uppercase tracking-[0.18em] text-white/45">Sesion actual</p>
+              <p class="truncate text-sm text-white/80">{userEmail}</p>
+            </div>
+          </div>
+
+          <div class="grid gap-2 admin-sidebar__footer-actions">
+            <a href={portalClientHref} class="admin-sidebar__secondary-link">
+              Ver portal cliente
+            </a>
+            <a href="/api/auth/logout" class="admin-sidebar__secondary-link">
+              Cerrar sesion
+            </a>
+          </div>
+        </div>
+      </aside>
+
+      <div class="admin-mobile-drawer lg:hidden" data-mobile-drawer aria-hidden="true">
+        <button
+          type="button"
+          class="admin-mobile-drawer__backdrop"
+          data-mobile-drawer-close
+          aria-label="Cerrar menu lateral"
+        ></button>
+
+        <aside class="admin-mobile-drawer__panel" id="admin-mobile-drawer" aria-label="Menu lateral de administracion">
+          <div class="admin-mobile-drawer__header">
+            <div class="admin-mobile-drawer__heading">
+              <p class="portal-eyebrow text-[11px]">Administracion interna</p>
+              <h2 class="admin-mobile-drawer__title">{currentSection}</h2>
+            </div>
+            <button
+              type="button"
+              class="admin-topbar__toggle"
+              data-mobile-drawer-close
+              aria-label="Cerrar menu lateral"
+            >
+              <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+          </div>
+
+          <p class="admin-mobile-drawer__section-label">Navegacion</p>
+          <nav class="admin-sidebar__nav admin-sidebar__nav--mobile">
+            {navItems.map((item) => (
+              <a
+                href={item.href}
+                class:list={[
+                  "admin-sidebar__link",
+                  activePath === item.activeInternalPath && "is-active"
+                ]}
+                title={item.label}
+                data-mobile-drawer-close
+              >
+                <span class="admin-sidebar__icon">
+                  <i class:list={["fa-solid", item.icon]} aria-hidden="true"></i>
+                </span>
+                <span class="admin-sidebar__label">{item.label}</span>
+              </a>
+            ))}
+          </nav>
+
+          <div class="admin-sidebar__footer admin-mobile-drawer__footer">
+            <p class="admin-mobile-drawer__section-label">Cuenta</p>
+            <div class="admin-sidebar__user">
+              <span class="admin-sidebar__user-dot"></span>
+              <div class="min-w-0 admin-sidebar__user-copy">
+                <p class="text-xs uppercase tracking-[0.18em] text-white/45">Sesion actual</p>
+                <p class="truncate text-sm text-white/80">{userEmail}</p>
+              </div>
+            </div>
+
+            <div class="grid gap-2 admin-sidebar__footer-actions">
+              <a href={portalClientHref} class="admin-sidebar__secondary-link" data-mobile-drawer-close>
+                Ver portal cliente
+              </a>
+              <a href="/api/auth/logout" class="admin-sidebar__secondary-link" data-mobile-drawer-close>
+                Cerrar sesion
+              </a>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <div class="admin-content">
+        <header class="admin-topbar">
+          <div class="admin-topbar__intro">
+            <p class="portal-eyebrow admin-topbar__eyebrow text-[11px]">Administracion interna</p>
+            <h2 class="admin-topbar__title">{currentSection}</h2>
+          </div>
+
+          <div class="admin-topbar__actions">
+            <button
+              type="button"
+              class="admin-topbar__toggle lg:hidden"
+              data-mobile-drawer-open
+              aria-expanded="false"
+              aria-controls="admin-mobile-drawer"
+              aria-label="Abrir menu lateral"
+            >
+              <i class="fa-solid fa-bars" aria-hidden="true"></i>
+            </button>
+            <button
+              type="button"
+              class="admin-topbar__toggle hidden lg:inline-flex"
+              data-sidebar-toggle
+              aria-expanded="true"
+              aria-label="Plegar menu lateral"
+            >
+              <i class="fa-solid fa-panel-left" aria-hidden="true"></i>
+            </button>
+            <a href={portalClientHref} class="portal-nav-link hidden rounded-full px-4 py-2 text-sm font-medium lg:inline-flex">
+              Ver portal cliente
+            </a>
+            <p class="hidden max-w-[240px] truncate text-sm text-white/65 xl:block">{userEmail}</p>
+            <a href="/api/auth/logout" class="portal-logout hidden rounded-full px-4 py-2 text-sm font-medium lg:inline-flex">
+              Cerrar sesion
+            </a>
+          </div>
+        </header>
+
+        <main class="admin-content__body">
+          <slot />
+        </main>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .admin-shell__frame {
+    min-height: 100vh;
+    display: grid;
+    grid-template-columns: 292px minmax(0, 1fr);
+    transition: grid-template-columns 0.25s ease;
+  }
+
+  .admin-sidebar {
+    position: sticky;
+    top: 0;
+    min-height: 100vh;
+    flex-direction: column;
+    justify-content: flex-start;
+    padding: 2rem 1.4rem;
+    gap: 1.35rem;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02)),
+      rgba(10, 8, 16, 0.92);
+    backdrop-filter: blur(18px);
+    transition: padding 0.25s ease;
+  }
+
+  .admin-sidebar__toggle,
+  .admin-topbar__toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.8);
+    transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .admin-sidebar__toggle:hover,
+  .admin-topbar__toggle:hover {
+    border-color: rgba(239, 124, 14, 0.32);
+    background: rgba(239, 124, 14, 0.08);
+    color: #fff;
+  }
+
+  .admin-sidebar__brand {
+    display: grid;
+    gap: 0.75rem;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+
+  .admin-sidebar__title {
+    margin: 0;
+    font-size: clamp(1.9rem, 2vw, 2.4rem);
+    line-height: 1.02;
+    color: #fff;
+  }
+
+  .admin-sidebar__nav {
+    display: grid;
+    gap: 0.55rem;
+    margin-top: 1.35rem;
+  }
+
+  .admin-sidebar__link {
+    display: grid;
+    grid-template-columns: 2.5rem minmax(0, 1fr);
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.85rem 0.95rem;
+    border-radius: 1.1rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.74);
+    background: rgba(255, 255, 255, 0.02);
+    transition: border-color 0.2s ease, background-color 0.2s ease, transform 0.2s ease;
+  }
+
+  .admin-sidebar__link:hover {
+    border-color: rgba(239, 124, 14, 0.28);
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    transform: translateX(1px);
+  }
+
+  .admin-sidebar__link.is-active {
+    border-color: rgba(239, 124, 14, 0.56);
+    background: rgba(239, 124, 14, 0.12);
+    color: #fff;
+    box-shadow: inset 0 0 0 1px rgba(239, 124, 14, 0.14);
+  }
+
+  .admin-sidebar__label {
+    white-space: nowrap;
+  }
+
+  .admin-sidebar__icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.95rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.86);
+  }
+
+  .admin-sidebar__footer {
+    display: grid;
+    gap: 1rem;
+    margin-top: auto;
+    padding-top: 0.25rem;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+
+  .admin-sidebar__user {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    padding: 0.95rem 1rem;
+    border-radius: 1.25rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  .admin-sidebar__user-dot {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 999px;
+    background: linear-gradient(135deg, rgba(239, 124, 14, 0.95), rgba(255, 194, 135, 0.95));
+    box-shadow: 0 0 0 0.28rem rgba(239, 124, 14, 0.12);
+  }
+
+  .admin-sidebar__secondary-link {
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0.85rem 1rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.76);
+    background: rgba(255, 255, 255, 0.03);
+    transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+  }
+
+  .admin-sidebar__secondary-link:hover {
+    border-color: rgba(239, 124, 14, 0.35);
+    background: rgba(239, 124, 14, 0.08);
+    color: #fff;
+  }
+
+  .admin-content {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .admin-mobile-drawer {
+    position: fixed;
+    inset: 0;
+    z-index: 45;
+    pointer-events: none;
+  }
+
+  .admin-mobile-drawer__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(7, 5, 12, 0.7);
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    transition: opacity 0.22s ease;
+  }
+
+  .admin-mobile-drawer__panel {
+    position: relative;
+    z-index: 1;
+    width: min(88vw, 348px);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 1.1rem;
+    padding: calc(1rem + env(safe-area-inset-top)) 1rem 1.4rem;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02)),
+      rgba(10, 8, 16, 0.96);
+    backdrop-filter: blur(18px);
+    box-shadow: 24px 0 48px rgba(0, 0, 0, 0.36);
+    transform: translateX(-100%);
+    transition: transform 0.24s ease;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .admin-mobile-drawer__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 0.2rem;
+  }
+
+  .admin-mobile-drawer__heading {
+    min-width: 0;
+    display: grid;
+    gap: 0.35rem;
+  }
+
+  .admin-mobile-drawer__title {
+    margin: 0;
+    font-size: 1.35rem;
+    line-height: 1.08;
+    color: #fff;
+  }
+
+  .admin-mobile-drawer__section-label {
+    margin: 0;
+    font-size: 0.72rem;
+    line-height: 1;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.45);
+  }
+
+  .admin-sidebar__nav--mobile {
+    margin-top: 0;
+    padding-top: 0.1rem;
+  }
+
+  .admin-mobile-drawer__footer {
+    margin-top: auto;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.07);
+  }
+
+  .admin-mobile-drawer.is-open {
+    pointer-events: auto;
+  }
+
+  .admin-mobile-drawer.is-open .admin-mobile-drawer__backdrop {
+    opacity: 1;
+  }
+
+  .admin-mobile-drawer.is-open .admin-mobile-drawer__panel {
+    transform: translateX(0);
+  }
+
+  .admin-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.4rem 2rem 1.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(15, 11, 22, 0.88);
+    backdrop-filter: blur(16px);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.14);
+  }
+
+  .admin-topbar__intro {
+    min-width: 0;
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .admin-topbar__title {
+    margin: 0;
+    font-size: clamp(1.7rem, 2vw, 2.25rem);
+    line-height: 1.05;
+    color: #fff;
+  }
+
+  .admin-topbar__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .admin-content__body {
+    min-width: 0;
+    padding: 1.25rem 1rem 2rem;
+  }
+
+  .admin-shell[data-sidebar-collapsed="true"] .admin-shell__frame {
+    grid-template-columns: 94px minmax(0, 1fr);
+  }
+
+  .admin-shell[data-sidebar-collapsed="true"] .admin-sidebar--desktop {
+    padding-inline: 1rem;
+  }
+
+  .admin-shell[data-sidebar-collapsed="true"] .admin-sidebar--desktop .admin-sidebar__brand,
+  .admin-shell[data-sidebar-collapsed="true"] .admin-sidebar--desktop .admin-sidebar__footer {
+    opacity: 0;
+    transform: translateX(-8px);
+    pointer-events: none;
+    height: 0;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+  }
+
+  .admin-shell[data-sidebar-collapsed="true"] .admin-sidebar--desktop .admin-sidebar__nav {
+    margin-top: 0.35rem;
+  }
+
+  .admin-shell[data-sidebar-collapsed="true"] .admin-sidebar--desktop .admin-sidebar__link {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    padding-inline: 0.5rem;
+  }
+
+  .admin-shell[data-sidebar-collapsed="true"] .admin-sidebar--desktop .admin-sidebar__label {
+    display: none;
+  }
+
+  :global(body.admin-mobile-drawer-open) {
+    overflow: hidden;
+  }
+
+  @media (max-width: 1023px) {
+    .admin-shell__frame {
+      display: block;
+    }
+
+    .admin-topbar {
+      align-items: center;
+      padding: calc(0.9rem + env(safe-area-inset-top)) 1rem 0.95rem;
+      gap: 0.75rem;
+    }
+
+    .admin-topbar__eyebrow {
+      display: none;
+    }
+
+    .admin-topbar__intro {
+      gap: 0;
+    }
+
+    .admin-topbar__title {
+      font-size: 1.2rem;
+      line-height: 1.1;
+    }
+
+    .admin-topbar__actions {
+      flex-wrap: nowrap;
+      gap: 0.5rem;
+    }
+
+    .admin-content__body {
+      padding: 1rem 0.9rem 1.6rem;
+    }
+  }
+</style>
+
+<script is:inline>
+  (() => {
+    const shell = document.querySelector(".admin-shell");
+    if (!(shell instanceof HTMLElement)) return;
+
+    const storageKey = "bt-admin-sidebar-collapsed";
+    const toggles = Array.from(document.querySelectorAll("[data-sidebar-toggle]"));
+    const mobileDrawer = document.querySelector("[data-mobile-drawer]");
+    const mobileDrawerOpens = Array.from(document.querySelectorAll("[data-mobile-drawer-open]"));
+    const mobileDrawerCloses = Array.from(document.querySelectorAll("[data-mobile-drawer-close]"));
+
+    const applyState = (collapsed) => {
+      shell.dataset.sidebarCollapsed = collapsed ? "true" : "false";
+
+      toggles.forEach((toggle) => {
+        if (!(toggle instanceof HTMLButtonElement)) return;
+        toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        toggle.setAttribute(
+          "aria-label",
+          collapsed ? "Expandir menu lateral" : "Plegar menu lateral"
+        );
+      });
+    };
+
+    const setDrawerOpen = (open) => {
+      if (!(mobileDrawer instanceof HTMLElement)) return;
+
+      mobileDrawer.classList.toggle("is-open", open);
+      mobileDrawer.setAttribute("aria-hidden", open ? "false" : "true");
+      document.body.classList.toggle("admin-mobile-drawer-open", open);
+
+      mobileDrawerOpens.forEach((toggle) => {
+        if (!(toggle instanceof HTMLButtonElement)) return;
+        toggle.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+    };
+
+    const stored = window.localStorage.getItem(storageKey);
+    applyState(stored === null ? true : stored === "true");
+
+    toggles.forEach((toggle) => {
+      toggle.addEventListener("click", () => {
+        const collapsed = shell.dataset.sidebarCollapsed === "true";
+        const next = !collapsed;
+        applyState(next);
+        window.localStorage.setItem(storageKey, next ? "true" : "false");
+      });
+    });
+
+    mobileDrawerOpens.forEach((toggle) => {
+      toggle.addEventListener("click", () => setDrawerOpen(true));
+    });
+
+    mobileDrawerCloses.forEach((toggle) => {
+      toggle.addEventListener("click", () => setDrawerOpen(false));
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        setDrawerOpen(false);
+      }
+    });
+
+    window.addEventListener("resize", () => {
+      if (window.innerWidth >= 1024) {
+        setDrawerOpen(false);
+      }
+    });
+  })();
+</script>

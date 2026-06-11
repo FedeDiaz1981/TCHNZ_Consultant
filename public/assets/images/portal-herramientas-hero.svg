@@ -1,0 +1,99 @@
+<svg width="1200" height="560" viewBox="0 0 1200 560" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="96" y1="48" x2="1048" y2="530" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#17111F"/>
+      <stop offset="1" stop-color="#0C0912"/>
+    </linearGradient>
+    <radialGradient id="glowPurple" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(188 128) rotate(33) scale(236 186)">
+      <stop stop-color="#76368C" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#76368C" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowOrange" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1038 98) rotate(128) scale(220 188)">
+      <stop stop-color="#EF7C0E" stop-opacity="0.36"/>
+      <stop offset="1" stop-color="#EF7C0E" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="keyboardStroke" x1="116" y1="175" x2="726" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EF7C0E" stop-opacity="0.42"/>
+      <stop offset="0.56" stop-color="#46558A" stop-opacity="0.24"/>
+      <stop offset="1" stop-color="#76368C" stop-opacity="0.34"/>
+    </linearGradient>
+    <linearGradient id="arrowStroke" x1="738" y1="210" x2="932" y2="210" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#EF7C0E"/>
+      <stop offset="1" stop-color="#76368C"/>
+    </linearGradient>
+    <filter id="shadow" x="84" y="134" width="690" height="332" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="24"/>
+      <feGaussianBlur stdDeviation="20"/>
+      <feComposite in2="hardAlpha" operator="out"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.0196078 0 0 0 0 0.0156863 0 0 0 0 0.0313726 0 0 0 0.48 0"/>
+      <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow" result="shape"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="560" rx="32" fill="url(#bg)"/>
+  <rect width="1200" height="560" rx="32" fill="url(#glowPurple)"/>
+  <rect width="1200" height="560" rx="32" fill="url(#glowOrange)"/>
+
+  <circle cx="116" cy="454" r="3.5" fill="#FFFFFF" fill-opacity="0.48"/>
+  <circle cx="154" cy="477" r="5" fill="#EF7C0E" fill-opacity="0.78"/>
+  <circle cx="1028" cy="106" r="4" fill="#EF7C0E" fill-opacity="0.88"/>
+  <circle cx="1082" cy="150" r="2.5" fill="#FFFFFF" fill-opacity="0.44"/>
+
+  <g filter="url(#shadow)">
+    <g transform="translate(128 182) rotate(0)">
+      <rect width="610" height="236" rx="30" fill="#17111F"/>
+      <rect x="0.75" y="0.75" width="608.5" height="234.5" rx="29.25" stroke="url(#keyboardStroke)" stroke-width="1.5"/>
+
+      <rect x="34" y="34" width="120" height="64" rx="18" fill="#21192A" stroke="#352A40"/>
+      <rect x="170" y="34" width="120" height="64" rx="18" fill="#21192A" stroke="#352A40"/>
+      <rect x="306" y="34" width="120" height="64" rx="18" fill="#21192A" stroke="#352A40"/>
+      <rect x="442" y="34" width="134" height="64" rx="18" fill="#21192A" stroke="#352A40"/>
+
+      <rect x="34" y="112" width="134" height="64" rx="18" fill="#21192A" stroke="#352A40"/>
+      <rect x="184" y="112" width="156" height="64" rx="18" fill="#2A1F34" stroke="#5A416F"/>
+      <rect x="356" y="112" width="104" height="64" rx="18" fill="#21192A" stroke="#352A40"/>
+      <rect x="476" y="112" width="100" height="64" rx="18" fill="#21192A" stroke="#352A40"/>
+
+      <rect x="34" y="190" width="168" height="20" rx="10" fill="#21192A" stroke="#352A40"/>
+      <rect x="220" y="190" width="228" height="20" rx="10" fill="#21192A" stroke="#352A40"/>
+      <rect x="466" y="190" width="110" height="20" rx="10" fill="#21192A" stroke="#352A40"/>
+
+      <rect x="206" y="126" width="112" height="36" rx="12" fill="#1C1523" stroke="#EF7C0E"/>
+
+      <circle cx="262" cy="144" r="10.5" stroke="#EF7C0E" stroke-width="2"/>
+      <path d="M262 131V136" stroke="#EF7C0E" stroke-width="2" stroke-linecap="round"/>
+      <path d="M262 152V157" stroke="#EF7C0E" stroke-width="2" stroke-linecap="round"/>
+      <path d="M249 144H254" stroke="#EF7C0E" stroke-width="2" stroke-linecap="round"/>
+      <path d="M270 144H275" stroke="#EF7C0E" stroke-width="2" stroke-linecap="round"/>
+      <path d="M253.2 135.2L256.7 138.7" stroke="#EF7C0E" stroke-width="2" stroke-linecap="round"/>
+      <path d="M267.3 149.3L270.8 152.8" stroke="#EF7C0E" stroke-width="2" stroke-linecap="round"/>
+      <path d="M270.8 135.2L267.3 138.7" stroke="#EF7C0E" stroke-width="2" stroke-linecap="round"/>
+      <path d="M256.7 149.3L253.2 152.8" stroke="#EF7C0E" stroke-width="2" stroke-linecap="round"/>
+
+      <text x="229" y="87" fill="#F0EBF6" font-family="'Futura Md BT','Trebuchet MS',sans-serif" font-size="17" letter-spacing="0.18em">KEYBOARD</text>
+      <text x="348" y="87" fill="#C8C0D3" font-family="'Futura Md BT','Trebuchet MS',sans-serif" font-size="15">corporate web tools</text>
+    </g>
+  </g>
+
+  <path d="M748 208C796 208 824 208 861 208C889 208 909 190 909 164C909 139 931 124 967 124H1000" stroke="url(#arrowStroke)" stroke-width="4" stroke-linecap="round"/>
+  <path d="M987 109L1006 124L987 139" stroke="#EF7C0E" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <text x="804" y="120" fill="#C9C1D5" font-family="'Futura Md BT','Trebuchet MS',sans-serif" font-size="18" letter-spacing="0.26em">PORTAL DE CLIENTES</text>
+  <text x="804" y="186" fill="#FFFFFF" font-family="'Futura Md BT','Trebuchet MS',sans-serif" font-size="74" font-weight="700">HERRAMIENTAS</text>
+  <text x="806" y="224" fill="#BDB5C9" font-family="'Futura Md BT','Trebuchet MS',sans-serif" font-size="20" letter-spacing="0.12em">WEB TOOLS FOR CLIENTS</text>
+
+  <rect x="806" y="274" width="228" height="56" rx="18" fill="#15101C" stroke="#35283F"/>
+  <text x="836" y="308" fill="#F0EBF6" font-family="'Futura Md BT','Trebuchet MS',sans-serif" font-size="16">Acceso centralizado</text>
+  <circle cx="1000" cy="302" r="10" fill="#EF7C0E"/>
+
+  <rect x="806" y="348" width="228" height="56" rx="18" fill="#15101C" stroke="#35283F"/>
+  <text x="836" y="382" fill="#F0EBF6" font-family="'Futura Md BT','Trebuchet MS',sans-serif" font-size="16">Filtros y estados</text>
+  <rect x="978" y="372" width="30" height="10" rx="5" fill="#46558A"/>
+
+  <rect x="806" y="422" width="228" height="56" rx="18" fill="#15101C" stroke="#35283F"/>
+  <text x="836" y="456" fill="#F0EBF6" font-family="'Futura Md BT','Trebuchet MS',sans-serif" font-size="16">Herramientas online</text>
+  <path d="M978 446H1013" stroke="#76368C" stroke-width="3" stroke-linecap="round"/>
+</svg>

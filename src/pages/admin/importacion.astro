@@ -1,0 +1,205 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import { getAdminFlash } from "../../lib/portal/admin-flash";
+import { getPortalModuleConfig } from "../../lib/portal/modules";
+
+const user = Astro.locals.user;
+const supabase = Astro.locals.supabase;
+const portalModule = Astro.locals.portalModule;
+const moduleConfig = getPortalModuleConfig(portalModule);
+
+if (!user || !supabase) {
+  return Astro.redirect("/consultant/login");
+}
+
+const flash = getAdminFlash(Astro.url);
+const rawReport = Astro.url.searchParams.get("import_report");
+let report: null | {
+  mode: "preview" | "commit";
+  clients: { total: number; processed: number; created: number; updated: number; errors: number };
+  users: { total: number; processed: number; created: number; updated: number; errors: number };
+  rowErrors: Array<{ entity: "client" | "user"; row: number; message: string }>;
+} = null;
+
+if (rawReport) {
+  try {
+    report = JSON.parse(rawReport);
+  } catch {
+    report = null;
+  }
+}
+
+const clientsTemplate = `name,slug,is_active
+Cliente Demo,cliente-demo,true
+Cliente Legacy,cliente-legacy,false`;
+
+const usersTemplate = `email,full_name,password,is_admin,client_slug,is_active
+ana@technized.com,Ana Perez,,false,cliente-demo,true
+admin@technized.com,Admin Portal,,true,,true`;
+---
+
+<AdminLayout
+  title={`Importacion masiva ${moduleConfig.name.es} | Technized`}
+  description={`Carga masiva complementaria de ${moduleConfig.entity.plural.es} y usuarios`}
+  userEmail={user.email ?? ""}
+  activePath="/admin/importacion"
+  portalModule={portalModule}
+>
+  <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+    {flash && (
+      <div
+        class:list={[
+          "mb-6 rounded-3xl border px-4 py-3.5 text-sm sm:px-5 sm:py-4",
+          flash.tone === "error"
+            ? "border-red-400/30 bg-red-500/10 text-red-50"
+            : "border-emerald-400/30 bg-emerald-500/10 text-emerald-50"
+        ]}
+      >
+        {flash.message}
+      </div>
+    )}
+
+    <section class="portal-panel rounded-[30px] p-5 sm:p-6">
+      <p class="portal-eyebrow text-[11px]">Importacion masiva</p>
+      <h2 class="mt-2 text-xl font-semibold text-white sm:text-2xl">Carga complementaria de consultores y usuarios</h2>
+      <p class="portal-copy mt-2 text-sm">
+        El circuito manual sigue activo. Esta pantalla agrega una alternativa para altas y actualizaciones en lote.
+      </p>
+
+      <div class="mt-4 flex flex-wrap gap-3">
+        <a
+          class="portal-action-link portal-action-link--ghost"
+          href="/consultant/templates/import-clientes.csv"
+          download="plantilla-clientes.csv"
+        >
+          Descargar plantilla consultores
+        </a>
+        <a
+          class="portal-action-link portal-action-link--ghost"
+          href="/consultant/templates/import-usuarios.csv"
+          download="plantilla-usuarios.csv"
+        >
+          Descargar plantilla usuarios
+        </a>
+      </div>
+
+      <form action="/consultant/api/admin/manage" method="POST" enctype="multipart/form-data" class="mt-6 grid gap-5">
+        <input type="hidden" name="intent" value="bulk-import" />
+        <input type="hidden" name="redirect_to" value="/admin/importacion" />
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <label class="grid gap-2">
+            <span class="text-sm font-semibold text-white">CSV de consultores</span>
+            <input
+              type="file"
+              name="clients_csv"
+              accept=".csv,text/csv"
+              class="rounded-2xl border border-white/15 bg-black/20 px-3 py-2.5 text-sm text-white file:mr-3 file:rounded-xl file:border-0 file:bg-secondary/20 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-secondary"
+            />
+          </label>
+          <label class="grid gap-2">
+            <span class="text-sm font-semibold text-white">CSV de usuarios</span>
+            <input
+              type="file"
+              name="users_csv"
+              accept=".csv,text/csv"
+              class="rounded-2xl border border-white/15 bg-black/20 px-3 py-2.5 text-sm text-white file:mr-3 file:rounded-xl file:border-0 file:bg-secondary/20 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-secondary"
+            />
+          </label>
+        </div>
+
+        <div class="flex flex-wrap gap-3">
+          <button class="portal-action-link portal-action-link--ghost" type="submit" name="mode" value="preview">
+            Validar archivo
+          </button>
+          <button class="portal-action-link portal-action-link--solid" type="submit" name="mode" value="commit">
+            Procesar importacion
+          </button>
+        </div>
+      </form>
+    </section>
+
+    {report && (
+      <section class="mt-6 portal-panel rounded-[30px] p-5 sm:p-6">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p class="portal-eyebrow text-[11px]">Resultado</p>
+            <h3 class="mt-2 text-lg font-semibold text-white">
+              {report.mode === "preview" ? "Validacion (sin guardar)" : "Importacion ejecutada"}
+            </h3>
+          </div>
+          <span class="rounded-full border border-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-white/75">
+            Errores: {report.clients.errors + report.users.errors}
+          </span>
+        </div>
+
+        <div class="mt-5 grid gap-4 md:grid-cols-2">
+          <article class="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <p class="text-sm font-semibold text-white">Consultores</p>
+            <ul class="mt-3 space-y-1 text-sm text-white/80">
+              <li>Total filas: {report.clients.total}</li>
+              <li>Procesados: {report.clients.processed}</li>
+              <li>Creados: {report.clients.created}</li>
+              <li>Actualizados: {report.clients.updated}</li>
+              <li>Con error: {report.clients.errors}</li>
+            </ul>
+          </article>
+          <article class="rounded-2xl border border-white/10 bg-white/5 p-4">
+            <p class="text-sm font-semibold text-white">Usuarios</p>
+            <ul class="mt-3 space-y-1 text-sm text-white/80">
+              <li>Total filas: {report.users.total}</li>
+              <li>Procesados: {report.users.processed}</li>
+              <li>Creados: {report.users.created}</li>
+              <li>Actualizados: {report.users.updated}</li>
+              <li>Con error: {report.users.errors}</li>
+            </ul>
+          </article>
+        </div>
+
+        <div class="mt-5 rounded-2xl border border-white/10 bg-black/20 p-4">
+          <p class="text-sm font-semibold text-white">Errores por fila</p>
+          {report.rowErrors.length === 0 ? (
+            <p class="mt-2 text-sm text-emerald-200">Sin errores de validacion.</p>
+          ) : (
+            <div class="mt-3 overflow-x-auto">
+              <table class="min-w-full text-sm">
+                <thead>
+                  <tr class="text-left text-white/65">
+                    <th class="py-2 pr-4">Entidad</th>
+                    <th class="py-2 pr-4">Fila</th>
+                    <th class="py-2">Detalle</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.rowErrors.map((error) => (
+                    <tr class="border-t border-white/10">
+                      <td class="py-2 pr-4 text-white">{error.entity === "client" ? "Consultor" : "Usuario"}</td>
+                      <td class="py-2 pr-4 text-white/80">{error.row}</td>
+                      <td class="py-2 text-red-200">{error.message}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {report.clients.errors + report.users.errors > report.rowErrors.length && (
+            <p class="mt-3 text-xs text-white/65">
+              Se muestran los primeros {report.rowErrors.length} errores para mantener la respuesta liviana.
+            </p>
+          )}
+        </div>
+      </section>
+    )}
+
+    <section class="mt-6 grid gap-5 xl:grid-cols-2">
+      <article class="portal-panel rounded-[30px] p-5 sm:p-6">
+        <p class="portal-eyebrow text-[11px]">Plantilla consultores</p>
+        <pre class="mt-3 overflow-auto rounded-2xl border border-white/10 bg-black/25 p-4 text-xs text-white/80">{clientsTemplate}</pre>
+      </article>
+      <article class="portal-panel rounded-[30px] p-5 sm:p-6">
+        <p class="portal-eyebrow text-[11px]">Plantilla usuarios</p>
+        <pre class="mt-3 overflow-auto rounded-2xl border border-white/10 bg-black/25 p-4 text-xs text-white/80">{usersTemplate}</pre>
+      </article>
+    </section>
+  </div>
+</AdminLayout>

@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/consultant/consultant-tools/totaldash/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard Proyectos Blatorh</title>
+    <style>
+      .td-hidden-by-host {
+        display: none !important;
+      }
+    </style>
+    <script type="module" crossorigin src="/consultant/consultant-tools/totaldash/assets/index-CY_M_wcA.js"></script>
+    <link rel="stylesheet" crossorigin href="/consultant/consultant-tools/totaldash/assets/index-CC44be05.css">
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      (function () {
+        const HIDE_LABELS = ["O continuar con", "SECURED BY BLATORH INC."];
+
+        function hideByText() {
+          const nodes = document.querySelectorAll("span, p, div, button");
+          nodes.forEach((node) => {
+            const text = (node.textContent || "").trim();
+            if (!text) return;
+            if (HIDE_LABELS.includes(text)) {
+              node.classList.add("td-hidden-by-host");
+            }
+            if (text === "Google" && node.tagName.toLowerCase() === "span") {
+              const btn = node.closest("button");
+              if (btn) btn.classList.add("td-hidden-by-host");
+            }
+          });
+        }
+
+        const observer = new MutationObserver(hideByText);
+        observer.observe(document.body, { childList: true, subtree: true });
+        hideByText();
+      })();
+    </script>
+  </body>
+</html>

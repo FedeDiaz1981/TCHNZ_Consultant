@@ -1,0 +1,182 @@
+---
+import LanguageSwitch from "./LanguageSwitch.astro";
+import type { CustomerLocale } from "../../lib/i18n/customers";
+import { withPortalBasePath } from "../../lib/portal/base-path";
+import { publicHomeUrl, publicSiteUrl } from "../../lib/auth/public";
+
+interface Props {
+  eyebrow: string;
+  heading: string;
+  copy?: string;
+  cardClass?: string;
+  locale?: CustomerLocale;
+  footerCopy?: string;
+  homeLabel?: string;
+}
+
+const {
+  eyebrow,
+  heading,
+  copy = "",
+  cardClass = "p-8",
+  locale = "es",
+  footerCopy = "Acceso a Technized Web Tools - Powered by BlatoRH",
+  homeLabel = "Home"
+} = Astro.props;
+
+const homeUrl = (() => {
+  const configuredHomeUrl = publicHomeUrl?.trim();
+
+  if (configuredHomeUrl) {
+    try {
+      return new URL(configuredHomeUrl).toString();
+    } catch {
+      return new URL(
+        configuredHomeUrl.startsWith("/") ? configuredHomeUrl : `/${configuredHomeUrl}`,
+        Astro.url
+      ).toString();
+    }
+  }
+
+  if (!publicSiteUrl) {
+    return null;
+  }
+
+  return new URL("/", new URL(publicSiteUrl)).toString();
+})();
+---
+
+<section class="portal-shell portal-shell--auth relative">
+  <a
+    href={withPortalBasePath("/")}
+    class="absolute left-6 top-6 z-10 inline-flex items-center sm:left-10 sm:top-8"
+    aria-label="Technized"
+  >
+    <img
+      src={withPortalBasePath("/assets/brand/logo-technized-white.png")}
+      alt="Technized"
+      class="h-auto w-[148px] sm:w-[172px]"
+    />
+  </a>
+
+  <div class="portal-auth-actions absolute right-6 top-6 z-10 flex items-center gap-3 sm:right-10 sm:top-8">
+    {homeUrl && (
+      <a
+        href={homeUrl}
+        class="portal-auth-home inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold text-white transition"
+        aria-label={homeLabel}
+      >
+        <span class="portal-auth-home__label">{homeLabel}</span>
+      </a>
+    )}
+
+    <LanguageSwitch locale={locale} redirectTo={`${Astro.url.pathname}${Astro.url.search}`} />
+  </div>
+
+  <div class="mx-auto flex min-h-screen max-w-6xl items-center px-6 py-24 sm:px-8 sm:py-28 lg:px-6 lg:py-16">
+    <div class="grid w-full gap-10 lg:grid-cols-[1.15fr_0.85fr]">
+      <div class="flex flex-col justify-center">
+        <p class="portal-eyebrow mb-3">{eyebrow}</p>
+        <h1 class="mb-4 text-4xl font-semibold leading-tight sm:text-5xl">{heading}</h1>
+        {copy && <p class="portal-copy max-w-xl text-lg">{copy}</p>}
+        <slot name="lead" />
+      </div>
+
+      <div class:list={["portal-panel portal-panel--warm rounded-[32px]", cardClass]}>
+        <slot />
+      </div>
+    </div>
+  </div>
+
+  <p class="absolute inset-x-6 bottom-5 z-10 text-center text-[11px] font-medium uppercase tracking-[0.18em] text-white/45 sm:bottom-7 sm:text-xs">
+    {footerCopy}
+  </p>
+</section>
+
+<style>
+  .portal-shell--auth {
+    background:
+      radial-gradient(circle at 18% 88%, rgba(126, 74, 50, 0.34) 0, rgba(126, 74, 50, 0.18) 18%, transparent 44%),
+      radial-gradient(circle at 78% 18%, rgba(239, 124, 14, 0.12) 0, rgba(239, 124, 14, 0.06) 18%, transparent 42%),
+      linear-gradient(180deg, #1a0f0d 0%, #140b0a 38%, #0b0710 100%);
+  }
+
+  .portal-auth-actions {
+    flex-wrap: nowrap;
+  }
+
+  .portal-auth-home {
+    min-height: 2.75rem;
+    padding-inline: 1.35rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03)),
+      rgba(255, 255, 255, 0.02);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+    backdrop-filter: blur(12px);
+  }
+
+  .portal-auth-home:hover {
+    transform: translateY(-1px);
+    border-color: rgba(255, 255, 255, 0.18);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04)),
+      rgba(255, 255, 255, 0.03);
+  }
+
+  .portal-auth-home__label {
+    letter-spacing: 0.01em;
+  }
+
+  :global(.portal-auth-actions .portal-language-switch__button) {
+    min-height: 2.75rem;
+    padding: 0.35rem 0.5rem 0.35rem 0.85rem;
+    border-color: rgba(255, 255, 255, 0.12);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.03)),
+      rgba(255, 255, 255, 0.02);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+  }
+
+  :global(.portal-auth-actions .portal-language-switch__button:hover) {
+    border-color: rgba(255, 140, 26, 0.4);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.05)),
+      rgba(255, 255, 255, 0.03);
+  }
+
+  :global(.portal-auth-actions .portal-language-switch__labels) {
+    gap: 0.4rem;
+    font-size: 0.76rem;
+  }
+
+  :global(.portal-auth-actions .portal-language-switch__track) {
+    width: 2.65rem;
+    height: 1.4rem;
+  }
+
+  :global(.portal-auth-actions .portal-language-switch__thumb) {
+    width: 1.05rem;
+    height: 1.05rem;
+  }
+
+  :global(.portal-auth-actions .portal-language-switch__track.is-en .portal-language-switch__thumb) {
+    transform: translateX(1.26rem);
+  }
+
+  @media (max-width: 640px) {
+    .portal-auth-actions {
+      gap: 0.5rem;
+      right: 1rem;
+      top: 1rem;
+    }
+
+    .portal-auth-home {
+      padding-inline: 1rem;
+    }
+
+    :global(.portal-auth-actions .portal-language-switch__button) {
+      padding-inline: 0.65rem;
+    }
+  }
+</style>

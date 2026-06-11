@@ -1,0 +1,279 @@
+﻿---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+import { getAdminFlash } from "../../lib/portal/admin-flash";
+import { getAdminApplications, getAdminClients, getAdminOverview, getAdminUsers } from "../../lib/portal/admin";
+import { getSectionHrefForPath } from "../../lib/portal/hosts";
+import { getModuleContentSection, getPortalModuleConfig } from "../../lib/portal/modules";
+
+const user = Astro.locals.user;
+const supabase = Astro.locals.supabase;
+const portalModule = Astro.locals.portalModule;
+const moduleConfig = getPortalModuleConfig(portalModule);
+const contentSection = getModuleContentSection(portalModule);
+
+if (!user || !supabase) {
+  return Astro.redirect("/consultant/login");
+}
+
+const flash = getAdminFlash(Astro.url);
+const [overview, clients, users, applications] = await Promise.all([
+  getAdminOverview(supabase, portalModule),
+  getAdminClients(supabase, portalModule),
+  getAdminUsers(supabase, portalModule),
+  getAdminApplications(supabase, portalModule)
+]);
+
+const latestClients = clients.slice(0, 4);
+const latestUsers = users.slice(0, 5);
+const highlightedApps = applications.slice(0, 4);
+const adminClientsHref = getSectionHrefForPath(Astro.url, "/admin/clientes");
+const adminUsersHref = getSectionHrefForPath(Astro.url, "/admin/usuarios");
+const adminApplicationsHref = getSectionHrefForPath(Astro.url, "/admin/aplicaciones");
+const adminBlogHref = getSectionHrefForPath(Astro.url, "/admin/blog");
+const adminAccessHref = getSectionHrefForPath(Astro.url, "/admin/accesos");
+
+const stats = [
+  {
+    label: "Consultores activos",
+    value: overview.activeClients,
+    meta: `${overview.totalClients} registrados`
+  },
+  {
+    label: "Usuarios activos",
+    value: overview.activeUsers,
+    meta: `${overview.adminUsers} administradores`
+  },
+  {
+    label: "Apps activas",
+    value: overview.activeApplications,
+    meta: `${overview.totalApplications} en catalogo`
+  },
+  {
+    label: "Accesos habilitados",
+    value: overview.enabledAccesses,
+    meta: `${overview.activeMemberships} membresias activas`
+  }
+];
+---
+
+<AdminLayout
+  title={`Administracion ${moduleConfig.name.es} | Technized`}
+  description={`Consola de administracion del modulo ${moduleConfig.name.es}`}
+  userEmail={user.email ?? ""}
+  activePath="/admin"
+  portalModule={portalModule}
+>
+  <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+    {flash && (
+      <div
+        class:list={[
+          "mb-6 rounded-3xl border px-4 py-3.5 text-sm sm:px-5 sm:py-4",
+          flash.tone === "error"
+            ? "border-red-400/30 bg-red-500/10 text-red-50"
+            : "border-emerald-400/30 bg-emerald-500/10 text-emerald-50"
+        ]}
+      >
+        {flash.message}
+      </div>
+    )}
+
+    <section class="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+      {stats.map((item) => (
+        <article class="portal-panel rounded-[28px] p-4 sm:p-5">
+          <p class="portal-eyebrow text-[11px]">{item.label}</p>
+          <div class="mt-3 text-3xl font-semibold text-white sm:text-4xl">{item.value}</div>
+          <p class="portal-copy mt-2 text-sm">{item.meta}</p>
+        </article>
+      ))}
+    </section>
+
+    <section class="mt-6 grid gap-5 sm:mt-8 sm:gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+      <article class="portal-panel rounded-[30px] p-5 sm:p-6">
+        <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p class="portal-eyebrow text-[11px]">{moduleConfig.entity.plural.es} recientes</p>
+            <h2 class="mt-2 text-xl font-semibold text-white sm:text-2xl">Vista general de cuentas</h2>
+          </div>
+          <a href={adminClientsHref} class="portal-action-link portal-action-link--solid w-full justify-center sm:w-auto">
+            Gestionar {moduleConfig.entity.plural.es.toLowerCase()}
+          </a>
+        </div>
+
+        <div class="mt-5 space-y-3 sm:mt-6 sm:space-y-4">
+          {latestClients.map((client) => (
+            <div class="rounded-3xl border border-white/10 bg-white/5 p-4">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 class="text-lg font-semibold text-white">{client.name}</h3>
+                  <p class="portal-copy text-sm">/{client.slug}</p>
+                </div>
+                <span
+                  class:list={[
+                    "rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em]",
+                    client.isActive
+                      ? "bg-emerald-500/15 text-emerald-100"
+                      : "bg-white/10 text-white/60"
+                  ]}
+                >
+                  {client.isActive ? "Activo" : "Pausado"}
+                </span>
+              </div>
+
+              <div class="mt-4 grid gap-3 sm:grid-cols-3">
+                <div class="rounded-2xl bg-black/20 px-4 py-3">
+                  <p class="portal-copy text-xs">Membresias</p>
+                  <strong class="mt-1 block text-xl text-white">{client.membershipsCount}</strong>
+                </div>
+                <div class="rounded-2xl bg-black/20 px-4 py-3">
+                  <p class="portal-copy text-xs">Managers/owners</p>
+                  <strong class="mt-1 block text-xl text-white">{client.managersCount}</strong>
+                </div>
+                <div class="rounded-2xl bg-black/20 px-4 py-3">
+                  <p class="portal-copy text-xs">Apps habilitadas</p>
+                  <strong class="mt-1 block text-xl text-white">{client.enabledApplicationsCount}</strong>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </article>
+
+      <article class="portal-panel rounded-[30px] p-5 sm:p-6">
+        <p class="portal-eyebrow text-[11px]">Atajos</p>
+        <h2 class="mt-2 text-xl font-semibold text-white sm:text-2xl">Tareas clave</h2>
+
+        <div class="mt-5 grid gap-3 sm:mt-6 sm:gap-4">
+          <a href={adminUsersHref} class="rounded-[24px] border border-white/10 bg-white/5 p-4 transition hover:border-secondary/50 hover:bg-white/10 sm:rounded-3xl sm:p-5">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <h3 class="text-lg font-semibold text-white">Gestion de usuarios</h3>
+                <p class="portal-copy mt-2 text-sm">
+                  Edita roles, activa cuentas y asigna miembros a consultores.
+                </p>
+              </div>
+              <i class="fa-solid fa-users text-2xl text-secondary" aria-hidden="true"></i>
+            </div>
+          </a>
+
+          <a href={adminApplicationsHref} class="rounded-[24px] border border-white/10 bg-white/5 p-4 transition hover:border-secondary/50 hover:bg-white/10 sm:rounded-3xl sm:p-5">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <h3 class="text-lg font-semibold text-white">Catalogo de aplicaciones</h3>
+                <p class="portal-copy mt-2 text-sm">
+                  Da de alta herramientas, ordena el catalogo y define estados.
+                </p>
+              </div>
+              <i class="fa-solid fa-layer-group text-2xl text-secondary" aria-hidden="true"></i>
+            </div>
+          </a>
+
+          {contentSection && (
+            <a href={adminBlogHref} class="rounded-[24px] border border-white/10 bg-white/5 p-4 transition hover:border-secondary/50 hover:bg-white/10 sm:rounded-3xl sm:p-5">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <h3 class="text-lg font-semibold text-white">
+                    {contentSection === "training" ? "Gestion de training" : "Gestion de blog"}
+                  </h3>
+                  <p class="portal-copy mt-2 text-sm">
+                    {contentSection === "training"
+                      ? "Publica material y contenidos de training para el modulo."
+                      : "Crea borradores, publica novedades y manten visible el contenido del portal."}
+                  </p>
+                </div>
+                <i class="fa-regular fa-newspaper text-2xl text-secondary" aria-hidden="true"></i>
+              </div>
+            </a>
+          )}
+
+          <a href={adminAccessHref} class="rounded-[24px] border border-white/10 bg-white/5 p-4 transition hover:border-secondary/50 hover:bg-white/10 sm:rounded-3xl sm:p-5">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <h3 class="text-lg font-semibold text-white">Matriz de accesos</h3>
+                <p class="portal-copy mt-2 text-sm">
+                  Habilita o pausa aplicaciones por consultor desde una sola vista.
+                </p>
+              </div>
+              <i class="fa-solid fa-key text-2xl text-secondary" aria-hidden="true"></i>
+            </div>
+          </a>
+        </div>
+      </article>
+    </section>
+
+    <section class="mt-6 grid gap-5 sm:mt-8 sm:gap-6 xl:grid-cols-2">
+      <article class="portal-panel rounded-[30px] p-5 sm:p-6">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p class="portal-eyebrow text-[11px]">Usuarios</p>
+            <h2 class="mt-2 text-xl font-semibold text-white sm:text-2xl">Equipo y cuentas</h2>
+          </div>
+          <span class="self-start rounded-full border border-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-white/70 sm:self-auto">
+            {users.length} registrados
+          </span>
+        </div>
+
+        <div class="mt-5 space-y-3">
+          {latestUsers.map((profile) => (
+            <div class="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-white/10 bg-white/5 px-4 py-3.5 sm:rounded-3xl sm:py-4">
+              <div class="min-w-0">
+                <h3 class="truncate text-base font-semibold text-white">
+                  {profile.fullName ?? profile.email}
+                </h3>
+                <p class="portal-copy truncate text-sm">{profile.email}</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="rounded-full bg-secondary/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-secondary">
+                  {profile.role}
+                </span>
+                <span
+                  class:list={[
+                    "rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em]",
+                    profile.isActive
+                      ? "bg-emerald-500/15 text-emerald-100"
+                      : "bg-white/10 text-white/60"
+                  ]}
+                >
+                  {profile.isActive ? "Activo" : "Inactivo"}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </article>
+
+      <article class="portal-panel rounded-[30px] p-5 sm:p-6">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p class="portal-eyebrow text-[11px]">Aplicaciones</p>
+            <h2 class="mt-2 text-xl font-semibold text-white sm:text-2xl">Estado del catalogo</h2>
+          </div>
+          <span class="self-start rounded-full border border-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-white/70 sm:self-auto">
+            {applications.length} total
+          </span>
+        </div>
+
+        <div class="mt-5 space-y-3">
+          {highlightedApps.map((application) => (
+            <div class="rounded-[24px] border border-white/10 bg-white/5 px-4 py-3.5 sm:rounded-3xl sm:py-4">
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 class="text-base font-semibold text-white">{application.name}</h3>
+                  <p class="portal-copy mt-1 text-sm">{application.category}</p>
+                </div>
+                <span class="rounded-full bg-secondary/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-secondary">
+                  {application.accessTier}
+                </span>
+              </div>
+              <div class="mt-3 flex flex-wrap items-center gap-4 text-sm text-white/80">
+                <span>{application.enabledClientsCount} consultores habilitados</span>
+                <span class="text-white/40">•</span>
+                <span>{application.availabilityStatus}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </article>
+    </section>
+  </div>
+</AdminLayout>
+

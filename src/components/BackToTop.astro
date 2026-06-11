@@ -1,0 +1,24 @@
+---
+import { socialLinks } from "../data/site";
+
+const floatingLinks = socialLinks.filter(
+  (link) => link.label === "Facebook" || link.label === "Instagram"
+);
+---
+
+<div class="floating-actions">
+  {floatingLinks.map((link) => (
+    <a
+      class="floating-social"
+      href={link.href}
+      aria-label={link.label}
+      target="_blank"
+      rel="noreferrer"
+    >
+      <i class={link.icon}></i>
+    </a>
+  ))}
+  <button onclick="topFunction()" id="myBtn">
+    <img src="/consultant/assets/images/up-arrow.png" alt="alternative" />
+  </button>
+</div>

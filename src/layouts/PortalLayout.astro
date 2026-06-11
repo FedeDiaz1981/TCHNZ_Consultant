@@ -1,0 +1,179 @@
+---
+import LanguageSwitch from "../components/portal/LanguageSwitch.astro";
+import BaseLayout from "./BaseLayout.astro";
+import { getCustomerUi, type CustomerLocale } from "../lib/i18n/customers";
+import { withPortalBasePath } from "../lib/portal/base-path";
+import { getSectionHrefForPath } from "../lib/portal/hosts";
+import {
+  getModuleContentNavLabel,
+  getModuleContentSection,
+  getModuleToolsNavLabel,
+  moduleRequiresAuth,
+  type PortalModule
+} from "../lib/portal/modules";
+
+const {
+  title = "Portal Consultores",
+  description = "Portal privado para consultores",
+  userEmail = "",
+  activePath = "/clientes/aplicaciones",
+  clientName = "",
+  clientLogoUrl = "",
+  locale = "es",
+  portalModule = Astro.locals.portalModule ?? "customers",
+  profileRole = "",
+  adminHref = getSectionHrefForPath(Astro.url, "/admin")
+} = Astro.props;
+
+const ui = getCustomerUi(locale as CustomerLocale);
+const currentModule = portalModule as PortalModule;
+const requiresAuth = moduleRequiresAuth(currentModule);
+const contentSection = getModuleContentSection(currentModule);
+const areaLabel =
+  requiresAuth
+    ? ui.portal.areaPrivate
+    : locale === "en"
+      ? "Public area"
+      : "Area publica";
+
+const navItems = [
+  {
+    href: getSectionHrefForPath(Astro.url, "/clientes/aplicaciones"),
+    label: getModuleToolsNavLabel(locale as CustomerLocale),
+    activeInternalPath: "/clientes/aplicaciones"
+  }
+];
+
+if (contentSection) {
+  navItems.push({
+    href: getSectionHrefForPath(Astro.url, "/clientes/blog"),
+    label: getModuleContentNavLabel(currentModule, locale as CustomerLocale),
+    activeInternalPath: "/clientes/blog"
+  });
+}
+
+const logoutHref = withPortalBasePath("/api/auth/logout");
+const showAdminButton = profileRole === "admin";
+---
+
+<BaseLayout title={title} description={description} lang={locale}>
+  <section class="portal-shell">
+    <header class="portal-header">
+      <div class="mx-auto max-w-6xl px-6 py-5">
+        <div class="flex items-start justify-between gap-4">
+          <div class="min-w-0">
+            <p class="portal-eyebrow text-xs">{areaLabel}</p>
+          </div>
+
+          <details class="portal-mobile-menu lg:hidden">
+            <summary class="portal-mobile-menu__trigger">
+              <i class="fa-solid fa-bars-staggered" aria-hidden="true"></i>
+              <span>{ui.portal.menu}</span>
+            </summary>
+
+            <div class="portal-mobile-menu__panel">
+              {(clientLogoUrl || clientName) && (
+                <div class="portal-mobile-menu__brand">
+                  {clientLogoUrl ? (
+                    <div class="portal-brand-box flex items-center justify-center rounded-2xl px-4 py-2">
+                      <img
+                        src={clientLogoUrl}
+                        alt={clientName || ui.portal.clientLogoAlt}
+                        class="max-h-10 w-auto object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div class="portal-brand-box rounded-2xl px-4 py-3 text-sm font-medium text-white/85">
+                      {clientName}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {requiresAuth && <p class="portal-email portal-mobile-menu__email">{userEmail}</p>}
+              {showAdminButton && (
+                <a
+                  href={adminHref}
+                  class="portal-nav-link inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-medium"
+                >
+                  <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                  <span>Panel de administracion</span>
+                </a>
+              )}
+              <LanguageSwitch locale={locale as CustomerLocale} redirectTo={`${Astro.url.pathname}${Astro.url.search}`} />
+              {requiresAuth && (
+                <a
+                  href={logoutHref}
+                  class="portal-logout portal-mobile-menu__logout rounded-full px-4 py-2 text-sm font-medium"
+                >
+                  {ui.portal.logout}
+                </a>
+              )}
+            </div>
+          </details>
+        </div>
+
+        <div class="mt-4 flex flex-col gap-4 lg:mt-5 lg:flex-row lg:flex-nowrap lg:items-center lg:justify-between">
+          <nav class="flex flex-wrap gap-2 lg:flex-nowrap lg:shrink-0">
+            {navItems.map((item) => {
+              const isActive = activePath === item.activeInternalPath;
+
+              return (
+                <a
+                  href={item.href}
+                  class:list={[
+                    "portal-nav-link rounded-full px-4 py-2 text-sm font-medium whitespace-nowrap",
+                    isActive && "is-active"
+                  ]}
+                >
+                  {item.label}
+                </a>
+              );
+            })}
+          </nav>
+
+          <div class="flex min-w-0 flex-wrap items-center gap-3 lg:flex-nowrap lg:shrink-0 lg:justify-end">
+            <LanguageSwitch locale={locale as CustomerLocale} redirectTo={`${Astro.url.pathname}${Astro.url.search}`} />
+
+            {clientLogoUrl ? (
+              <div class="portal-brand-box flex items-center justify-center rounded-2xl px-4 py-2">
+                <img
+                  src={clientLogoUrl}
+                  alt={clientName || ui.portal.clientLogoAlt}
+                  class="max-h-10 w-auto object-contain"
+                />
+              </div>
+            ) : clientName ? (
+              <div class="portal-brand-box rounded-2xl px-4 py-3 text-sm font-medium text-white/85">
+                {clientName}
+              </div>
+            ) : null}
+
+            {requiresAuth && <p class="portal-email portal-email--inline max-w-[180px]">{userEmail}</p>}
+            {showAdminButton && (
+              <a
+                href={adminHref}
+                class="portal-nav-link hidden items-center gap-2 rounded-full px-4 py-2 text-sm font-medium whitespace-nowrap lg:inline-flex"
+              >
+                <i class="fa-solid fa-shield-halved" aria-hidden="true"></i>
+                <span>Panel de administracion</span>
+              </a>
+            )}
+            {requiresAuth && (
+              <a
+                href={logoutHref}
+                class="portal-logout hidden rounded-full px-4 py-2 text-sm font-medium whitespace-nowrap lg:inline-flex"
+              >
+                {ui.portal.logout}
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="portal-main">
+      <slot />
+    </main>
+  </section>
+</BaseLayout>

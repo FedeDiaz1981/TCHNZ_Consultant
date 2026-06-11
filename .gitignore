@@ -1,0 +1,11 @@
+.env
+.env.local
+.env.*.local
+env_prod/.env
+dist
+node_modules
+.astro
+.vercel
+*.log
+public/assets/client-logos/*
+!public/assets/client-logos/.gitkeep
