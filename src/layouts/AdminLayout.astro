@@ -27,6 +27,7 @@ const navItems = [
     activeInternalPath: "/admin/clientes"
   },
   { href: getSectionHrefForPath(Astro.url, "/admin/usuarios"), label: "Usuarios", icon: "fa-users", activeInternalPath: "/admin/usuarios" },
+  { href: getSectionHrefForPath(Astro.url, "/admin/importacion"), label: "Importación", icon: "fa-file-import", activeInternalPath: "/admin/importacion" },
   { href: getSectionHrefForPath(Astro.url, "/admin/aplicaciones"), label: "Aplicaciones", icon: "fa-layer-group", activeInternalPath: "/admin/aplicaciones" },
   ...(contentSection
     ? [
@@ -38,6 +39,8 @@ const navItems = [
         }
       ]
     : []),
+  { href: getSectionHrefForPath(Astro.url, "/admin/correos"), label: "Correos", icon: "fa-envelope", activeInternalPath: "/admin/correos" },
+  { href: getSectionHrefForPath(Astro.url, "/admin/listas-difusion"), label: "Listas de difusión", icon: "fa-list-check", activeInternalPath: "/admin/listas-difusion" },
   { href: getSectionHrefForPath(Astro.url, "/admin/accesos"), label: "Accesos", icon: "fa-key", activeInternalPath: "/admin/accesos" }
 ];
 
