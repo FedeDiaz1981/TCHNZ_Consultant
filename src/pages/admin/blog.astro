@@ -29,6 +29,7 @@ const [posts, distributionContacts, distributionLists] = await Promise.all([
   getAdminDistributionLists(supabase, portalModule)
 ]);
 const sectionLabel = contentSection === "training" ? "Training" : "Blog";
+const distributionContactsById = new Map(distributionContacts.map((contact) => [contact.id, contact]));
 
 const statusLabels = {
   draft: "Borrador",
@@ -69,6 +70,38 @@ function formatDateTimeInput(value: string | null) {
   const localDate = new Date(date.getTime() - offset * 60_000);
   return localDate.toISOString().slice(0, 16);
 }
+
+const distributionModalData = {
+  lists: distributionLists.map((list) => ({
+    id: list.id,
+    name: list.name,
+    description: list.description ?? "",
+    isActive: list.isActive,
+    memberCount: list.memberCount,
+    updatedAt: list.updatedAt,
+    members: list.memberIds
+      .map((memberId) => distributionContactsById.get(memberId))
+      .filter((contact): contact is (typeof distributionContacts)[number] => Boolean(contact))
+      .map((contact) => ({
+        id: contact.id,
+        email: contact.email,
+        displayName: contact.displayName ?? "",
+        notes: contact.notes ?? "",
+        isActive: contact.isActive
+      }))
+  })),
+  contacts: distributionContacts.map((contact) => ({
+    id: contact.id,
+    email: contact.email,
+    displayName: contact.displayName ?? "",
+    notes: contact.notes ?? "",
+    isActive: contact.isActive,
+    updatedAt: contact.updatedAt,
+    searchLabel: `${contact.email} ${contact.displayName ?? ""}`.toLowerCase()
+  }))
+};
+
+const distributionModalDataJson = JSON.stringify(distributionModalData).replace(/</g, "\\u003c");
 ---
 
 <AdminLayout
@@ -375,50 +408,69 @@ function formatDateTimeInput(value: string | null) {
                                     </label>
 
                                     <div class="mt-4 rounded-[20px] border border-white/10 bg-black/10 p-4" data-distribution-config hidden={!post.distributionEmailEnabled}>
-                                      <label class="block">
-                                        <span class="mb-2 block text-sm font-medium text-white/80">Correos libres</span>
-                                        <textarea
-                                          class="portal-input min-h-24 w-full rounded-2xl px-4 py-3"
-                                          name="distribution_emails"
-                                          placeholder="articulo1@empresa.com, articulo2@empresa.com"
-                                        >{post.distributionEmails.join("\n")}</textarea>
-                                        <p class="portal-copy mt-2 text-xs">
-                                          Un email por linea o separado por comas.
-                                        </p>
-                                      </label>
+                                      <div class="space-y-4">
+                                        <section
+                                          class="admin-blog-distribution-field"
+                                          data-distribution-field-root
+                                          data-distribution-field-type="lists"
+                                          data-selected-ids={post.distributionListIds.join(",")}
+                                          data-initial-selected-ids={post.distributionListIds.join(",")}
+                                        >
+                                          <div class="admin-blog-distribution-field__header">
+                                            <div>
+                                              <span class="mb-1 block text-sm font-medium text-white/80">Listas de difusión</span>
+                                              <p class="portal-copy text-xs">Haz clic en una lista para ver sus correos.</p>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              class="distribution-icon-button distribution-icon-button--add"
+                                              data-distribution-picker-open="lists"
+                                              aria-label="Agregar listas de difusión"
+                                              title="Agregar listas de difusión"
+                                            >
+                                              <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                                            </button>
+                                          </div>
+                                          <div class="admin-blog-distribution-field__chips" data-distribution-chip-list></div>
+                                          <div class="hidden" data-distribution-hidden-inputs></div>
+                                        </section>
 
-                                      <div class="mt-4 grid gap-4 lg:grid-cols-2">
-                                        <label class="block">
-                                          <span class="mb-2 block text-sm font-medium text-white/80">Correos cargados</span>
-                                          <select
-                                            class="portal-input min-h-44 w-full rounded-2xl px-4 py-3"
-                                            name="distribution_contact_ids"
-                                            multiple
-                                          >
-                                            {distributionContacts.map((contact) => (
-                                              <option value={contact.id} selected={post.distributionContactIds.includes(contact.id)}>
-                                                {contact.email}
-                                                {contact.displayName ? ` · ${contact.displayName}` : ""}
-                                              </option>
-                                            ))}
-                                          </select>
-                                          <p class="portal-copy mt-2 text-xs">Mantene Ctrl/Cmd para elegir varios correos.</p>
-                                        </label>
+                                        <section
+                                          class="admin-blog-distribution-field"
+                                          data-distribution-field-root
+                                          data-distribution-field-type="contacts"
+                                          data-selected-ids={post.distributionContactIds.join(",")}
+                                          data-initial-selected-ids={post.distributionContactIds.join(",")}
+                                        >
+                                          <div class="admin-blog-distribution-field__header">
+                                            <div>
+                                              <span class="mb-1 block text-sm font-medium text-white/80">Correos de lista</span>
+                                              <p class="portal-copy text-xs">Haz clic en un correo para ver su detalle.</p>
+                                            </div>
+                                            <button
+                                              type="button"
+                                              class="distribution-icon-button distribution-icon-button--add"
+                                              data-distribution-picker-open="contacts"
+                                              aria-label="Agregar correos de lista"
+                                              title="Agregar correos de lista"
+                                            >
+                                              <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                                            </button>
+                                          </div>
+                                          <div class="admin-blog-distribution-field__chips" data-distribution-chip-list></div>
+                                          <div class="hidden" data-distribution-hidden-inputs></div>
+                                        </section>
 
                                         <label class="block">
-                                          <span class="mb-2 block text-sm font-medium text-white/80">Listas de difusión</span>
-                                          <select
-                                            class="portal-input min-h-44 w-full rounded-2xl px-4 py-3"
-                                            name="distribution_list_ids"
-                                            multiple
-                                          >
-                                            {distributionLists.map((list) => (
-                                              <option value={list.id} selected={post.distributionListIds.includes(list.id)}>
-                                                {list.name} · {list.memberCount} correos
-                                              </option>
-                                            ))}
-                                          </select>
-                                          <p class="portal-copy mt-2 text-xs">Mantene Ctrl/Cmd para elegir varias listas.</p>
+                                          <span class="mb-2 block text-sm font-medium text-white/80">Correos libres</span>
+                                          <textarea
+                                            class="portal-input min-h-24 w-full rounded-2xl px-4 py-3"
+                                            name="distribution_emails"
+                                            placeholder="articulo1@empresa.com, articulo2@empresa.com"
+                                          >{post.distributionEmails.join("\n")}</textarea>
+                                          <p class="portal-copy mt-2 text-xs">
+                                            Un email por linea o separado por comas.
+                                          </p>
                                         </label>
                                       </div>
                                     </div>
@@ -613,50 +665,69 @@ function formatDateTimeInput(value: string | null) {
             </label>
 
             <div class="mt-4 rounded-[20px] border border-white/10 bg-black/10 p-4" data-distribution-config hidden>
-              <label class="block">
-                <span class="mb-2 block text-sm font-medium text-white/80">Correos libres</span>
-                <textarea
-                  class="portal-input min-h-24 w-full rounded-2xl px-4 py-3"
-                  name="distribution_emails"
-                  placeholder="articulo1@empresa.com, articulo2@empresa.com"
-                ></textarea>
-                <p class="portal-copy mt-2 text-xs">
-                  Un email por linea o separado por comas.
-                </p>
-              </label>
+              <div class="space-y-4">
+                <section
+                  class="admin-blog-distribution-field"
+                  data-distribution-field-root
+                  data-distribution-field-type="lists"
+                  data-selected-ids=""
+                  data-initial-selected-ids=""
+                >
+                  <div class="admin-blog-distribution-field__header">
+                    <div>
+                      <span class="mb-1 block text-sm font-medium text-white/80">Listas de difusión</span>
+                      <p class="portal-copy text-xs">Haz clic en una lista para ver sus correos.</p>
+                    </div>
+                    <button
+                      type="button"
+                      class="distribution-icon-button distribution-icon-button--add"
+                      data-distribution-picker-open="lists"
+                      aria-label="Agregar listas de difusión"
+                      title="Agregar listas de difusión"
+                    >
+                      <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                  <div class="admin-blog-distribution-field__chips" data-distribution-chip-list></div>
+                  <div class="hidden" data-distribution-hidden-inputs></div>
+                </section>
 
-              <div class="mt-4 grid gap-4 lg:grid-cols-2">
-                <label class="block">
-                  <span class="mb-2 block text-sm font-medium text-white/80">Correos cargados</span>
-                  <select
-                    class="portal-input min-h-44 w-full rounded-2xl px-4 py-3"
-                    name="distribution_contact_ids"
-                    multiple
-                  >
-                    {distributionContacts.map((contact) => (
-                      <option value={contact.id}>
-                        {contact.email}
-                        {contact.displayName ? ` · ${contact.displayName}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <p class="portal-copy mt-2 text-xs">Mantene Ctrl/Cmd para elegir varios correos.</p>
-                </label>
+                <section
+                  class="admin-blog-distribution-field"
+                  data-distribution-field-root
+                  data-distribution-field-type="contacts"
+                  data-selected-ids=""
+                  data-initial-selected-ids=""
+                >
+                  <div class="admin-blog-distribution-field__header">
+                    <div>
+                      <span class="mb-1 block text-sm font-medium text-white/80">Correos de lista</span>
+                      <p class="portal-copy text-xs">Haz clic en un correo para ver su detalle.</p>
+                    </div>
+                    <button
+                      type="button"
+                      class="distribution-icon-button distribution-icon-button--add"
+                      data-distribution-picker-open="contacts"
+                      aria-label="Agregar correos de lista"
+                      title="Agregar correos de lista"
+                    >
+                      <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                  <div class="admin-blog-distribution-field__chips" data-distribution-chip-list></div>
+                  <div class="hidden" data-distribution-hidden-inputs></div>
+                </section>
 
                 <label class="block">
-                  <span class="mb-2 block text-sm font-medium text-white/80">Listas de difusión</span>
-                  <select
-                    class="portal-input min-h-44 w-full rounded-2xl px-4 py-3"
-                    name="distribution_list_ids"
-                    multiple
-                  >
-                    {distributionLists.map((list) => (
-                      <option value={list.id}>
-                        {list.name} · {list.memberCount} correos
-                      </option>
-                    ))}
-                  </select>
-                  <p class="portal-copy mt-2 text-xs">Mantene Ctrl/Cmd para elegir varias listas.</p>
+                  <span class="mb-2 block text-sm font-medium text-white/80">Correos libres</span>
+                  <textarea
+                    class="portal-input min-h-24 w-full rounded-2xl px-4 py-3"
+                    name="distribution_emails"
+                    placeholder="articulo1@empresa.com, articulo2@empresa.com"
+                  ></textarea>
+                  <p class="portal-copy mt-2 text-xs">
+                    Un email por linea o separado por comas.
+                  </p>
                 </label>
               </div>
             </div>
@@ -678,7 +749,74 @@ function formatDateTimeInput(value: string | null) {
       </form>
     </div>
   </dialog>
+
+  <dialog class="distribution-picker-dialog" data-distribution-picker-dialog>
+    <div class="distribution-picker-dialog__panel portal-panel rounded-[32px] p-0">
+      <div class="distribution-picker-dialog__header flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4 sm:px-6">
+        <div>
+          <p class="portal-eyebrow text-[11px]" data-distribution-picker-eyebrow>Seleccion</p>
+          <h3 class="mt-2 text-2xl font-semibold text-white" data-distribution-picker-title>Agregar elementos</h3>
+          <p class="portal-copy mt-1 text-sm" data-distribution-picker-subtitle>Elegi uno o varios elementos para el articulo.</p>
+        </div>
+
+        <button
+          type="button"
+          class="rounded-full border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/70 transition hover:border-white/20 hover:text-white"
+          data-distribution-picker-close
+        >
+          Cerrar
+        </button>
+      </div>
+
+      <div class="distribution-picker-dialog__body px-5 py-5 sm:px-6">
+        <label class="distribution-picker-search">
+          <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+          <input type="search" placeholder="Buscar" data-distribution-picker-search />
+        </label>
+
+        <div class="mt-4 flex items-center justify-between gap-3">
+          <p class="portal-copy text-sm" data-distribution-picker-summary>0 seleccionados</p>
+          <p class="portal-copy text-xs">Los cambios se aplican al guardar la seleccion.</p>
+        </div>
+
+        <div class="mt-4 distribution-picker-list" data-distribution-picker-list></div>
+      </div>
+
+      <div class="distribution-picker-dialog__footer flex flex-wrap items-center justify-end gap-3 border-t border-white/10 px-5 py-4 sm:px-6">
+        <button type="button" class="portal-action-link" data-distribution-picker-close>Cancelar</button>
+        <button type="button" class="portal-action-link portal-action-link--solid" data-distribution-picker-save>
+          Guardar seleccion
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+  <dialog class="distribution-detail-dialog" data-distribution-detail-dialog>
+    <div class="distribution-detail-dialog__panel portal-panel rounded-[32px] p-0">
+      <div class="distribution-detail-dialog__header flex items-start justify-between gap-4 border-b border-white/10 px-5 py-4 sm:px-6">
+        <div>
+          <p class="portal-eyebrow text-[11px]" data-distribution-detail-eyebrow>Detalle</p>
+          <h3 class="mt-2 text-2xl font-semibold text-white" data-distribution-detail-title>Detalle</h3>
+          <p class="portal-copy mt-1 text-sm" data-distribution-detail-subtitle>Revisá la información seleccionada.</p>
+        </div>
+
+        <button
+          type="button"
+          class="rounded-full border border-white/10 px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/70 transition hover:border-white/20 hover:text-white"
+          data-distribution-detail-close
+        >
+          Cerrar
+        </button>
+      </div>
+
+      <div class="distribution-detail-dialog__body px-5 py-5 sm:px-6">
+        <div class="distribution-detail-list" data-distribution-detail-body></div>
+      </div>
+    </div>
+  </dialog>
 </AdminLayout>
+
+<script type="application/json" id="distribution-modal-data" set:html={distributionModalDataJson}></script>
 
 <style>
   .admin-blog-toolbar {
@@ -809,6 +947,262 @@ function formatDateTimeInput(value: string | null) {
     background: rgba(16, 185, 129, 0.16);
     color: #d1fae5;
     border-color: rgba(52, 211, 153, 0.32);
+  }
+
+  :global(.admin-blog-distribution-field) {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 1.2rem;
+    padding: 0.95rem;
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  :global(.admin-blog-distribution-field__header) {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.9rem;
+  }
+
+  :global(.admin-blog-distribution-field__chips) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    min-height: 3rem;
+  }
+
+  :global(.admin-blog-distribution-empty) {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.5rem;
+    border-radius: 999px;
+    border: 1px dashed rgba(255, 255, 255, 0.14);
+    color: rgba(255, 255, 255, 0.55);
+    padding: 0.25rem 0.75rem;
+    font-size: 0.82rem;
+  }
+
+  :global(.distribution-chip) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 10px;
+    overflow: hidden;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.11);
+    background: rgba(255, 255, 255, 0.05);
+    padding-left: 12px;
+  }
+
+  :global(.distribution-chip__main),
+  :global(.distribution-chip__remove),
+  :global(.distribution-icon-button) {
+    border: 0;
+    cursor: pointer;
+    font: inherit;
+  }
+
+  :global(.distribution-chip__main) {
+    min-width: 0;
+    display: block;
+    align-items: center;
+    padding: 0.5rem 0;
+    color: #fff;
+    background: transparent;
+    text-align: left;
+  }
+
+  :global(.distribution-chip__main strong) {
+    font-size: 0.84rem;
+    font-weight: 700;
+  }
+
+  :global(.distribution-chip__meta) {
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+
+  :global(.distribution-chip__copy) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  :global(.distribution-chip__title),
+  :global(.distribution-chip__meta) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  :global(.distribution-chip__title) {
+    color: #fff;
+    padding-right: 10px;
+  }
+
+  :global(.distribution-chip__meta) {
+    color: rgba(255, 255, 255, 0.58);
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding-left: 10px;
+  }
+
+  :global(.distribution-chip__copy .distribution-chip__meta) {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  :global(.distribution-chip__remove) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.6rem;
+    padding: 0.45rem 0;
+    color: #ffd9b3;
+    background: rgba(255, 140, 26, 0.12);
+    border-left: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  :global(.distribution-chip__remove:hover) {
+    background: rgba(255, 140, 26, 0.2);
+  }
+
+  :global(.distribution-icon-button) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.6rem;
+    min-height: 2.6rem;
+    padding: 0.55rem;
+    border-radius: 0.9rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
+    transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+  }
+
+  :global(.distribution-icon-button:hover) {
+    border-color: rgba(255, 140, 26, 0.35);
+    background: rgba(255, 140, 26, 0.14);
+    transform: translateY(-1px);
+  }
+
+  .distribution-icon-button--add {
+    color: #ffd1a6;
+    box-shadow: 0 0 18px rgba(255, 140, 26, 0.18);
+  }
+
+  .distribution-icon-button--create {
+    min-width: 2.9rem;
+  }
+
+  .distribution-picker-dialog,
+  .distribution-detail-dialog {
+    width: min(900px, calc(100vw - 2rem));
+    max-width: 900px;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    color: inherit;
+  }
+
+  .distribution-picker-dialog::backdrop,
+  .distribution-detail-dialog::backdrop {
+    background: rgba(8, 6, 14, 0.82);
+    backdrop-filter: blur(10px);
+  }
+
+  .distribution-picker-dialog__panel,
+  .distribution-detail-dialog__panel {
+    overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.38);
+  }
+
+  .distribution-picker-dialog__header,
+  .distribution-picker-dialog__footer,
+  .distribution-detail-dialog__header {
+    background: rgba(13, 10, 20, 0.92);
+    backdrop-filter: blur(18px);
+  }
+
+  .distribution-picker-dialog__body,
+  .distribution-detail-dialog__body {
+    max-height: min(72vh, 760px);
+    overflow: auto;
+  }
+
+  .distribution-picker-search {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.9rem 1rem;
+    border-radius: 1.1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .distribution-picker-search input {
+    width: 100%;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: #fff;
+    font: inherit;
+  }
+
+  .distribution-picker-search input::placeholder {
+    color: rgba(255, 255, 255, 0.42);
+  }
+
+  .distribution-picker-list {
+    display: grid;
+    gap: 0.7rem;
+  }
+
+  .distribution-picker-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.8rem;
+    padding: 0.9rem 1rem;
+    border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+  }
+
+  .distribution-picker-item__copy {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .distribution-picker-item__title {
+    display: block;
+    color: #fff;
+    font-weight: 700;
+  }
+
+  .distribution-picker-item__meta {
+    display: block;
+    margin-top: 0.15rem;
+    color: rgba(255, 255, 255, 0.65);
+    font-size: 0.84rem;
+  }
+
+  .distribution-detail-list {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .distribution-detail-card {
+    border-radius: 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
+    padding: 0.9rem 1rem;
   }
 
   .admin-blog-dialog {
@@ -1255,6 +1649,7 @@ function formatDateTimeInput(value: string | null) {
       });
 
       syncAllDistributionConfigs(formNode);
+      window.resetDistributionFields?.(formNode);
     }
   });
 
@@ -2263,4 +2658,468 @@ function formatDateTimeInput(value: string | null) {
       });
     });
   });
+</script>
+
+<script>
+  (() => {
+    const dataNode = document.getElementById("distribution-modal-data");
+    if (!(dataNode instanceof HTMLScriptElement)) return;
+
+    let data;
+    try {
+      data = JSON.parse(dataNode.textContent || "{}");
+    } catch {
+      return;
+    }
+
+    const lists = Array.isArray(data.lists) ? data.lists : [];
+    const contacts = Array.isArray(data.contacts) ? data.contacts : [];
+    const listsById = new Map(lists.map((list) => [list.id, list]));
+    const contactsById = new Map(contacts.map((contact) => [contact.id, contact]));
+
+    const pickerDialog = document.querySelector("[data-distribution-picker-dialog]");
+    const detailDialog = document.querySelector("[data-distribution-detail-dialog]");
+    const pickerTitle = document.querySelector("[data-distribution-picker-title]");
+    const pickerSubtitle = document.querySelector("[data-distribution-picker-subtitle]");
+    const pickerEyebrow = document.querySelector("[data-distribution-picker-eyebrow]");
+    const pickerSearch = document.querySelector("[data-distribution-picker-search]");
+    const pickerSummary = document.querySelector("[data-distribution-picker-summary]");
+    const pickerList = document.querySelector("[data-distribution-picker-list]");
+    const pickerSave = document.querySelector("[data-distribution-picker-save]");
+    const detailTitle = document.querySelector("[data-distribution-detail-title]");
+    const detailSubtitle = document.querySelector("[data-distribution-detail-subtitle]");
+    const detailEyebrow = document.querySelector("[data-distribution-detail-eyebrow]");
+    const detailBody = document.querySelector("[data-distribution-detail-body]");
+
+    let activeFieldRoot = null;
+    let activeFieldType = null;
+    let pendingSelectedIds = new Set();
+
+    function getItems(type) {
+      return type === "contacts" ? contacts : lists;
+    }
+
+    function getItem(type, itemId) {
+      return type === "contacts" ? contactsById.get(itemId) ?? null : listsById.get(itemId) ?? null;
+    }
+
+    function getFieldSelectedIds(root) {
+      return (root.dataset.selectedIds || "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean);
+    }
+
+    function setFieldSelectedIds(root, ids) {
+      root.dataset.selectedIds = ids.join(",");
+      renderField(root);
+    }
+
+    function getDisplayTitle(type, item) {
+      if (type === "contacts") {
+        return item.displayName?.trim() || item.email;
+      }
+      return item.name;
+    }
+
+    function getDisplayMeta(type, item) {
+      if (type === "contacts") {
+        return item.displayName?.trim() ? item.email : item.notes || "Sin notas";
+      }
+      return `${item.memberCount} correos`;
+    }
+
+    function getInputName(type) {
+      return type === "contacts" ? "distribution_contact_ids" : "distribution_list_ids";
+    }
+
+    function renderEmptyState(container, message) {
+      container.replaceChildren();
+      const empty = document.createElement("span");
+      empty.className = "admin-blog-distribution-empty";
+      empty.textContent = message;
+      container.appendChild(empty);
+    }
+
+    function renderField(root) {
+      const type = root.dataset.distributionFieldType;
+      const chipList = root.querySelector("[data-distribution-chip-list]");
+      const hiddenInputs = root.querySelector("[data-distribution-hidden-inputs]");
+
+      if (!(chipList instanceof HTMLElement) || !(hiddenInputs instanceof HTMLElement)) return;
+
+      const selectedIds = getFieldSelectedIds(root);
+      const selectedItems = selectedIds
+        .map((itemId) => getItem(type, itemId))
+        .filter((item) => Boolean(item));
+
+      chipList.replaceChildren();
+      hiddenInputs.replaceChildren();
+
+      if (selectedItems.length === 0) {
+        renderEmptyState(chipList, "Sin elementos seleccionados.");
+        return;
+      }
+
+      selectedItems.forEach((item) => {
+        const chip = document.createElement("div");
+        chip.className = "distribution-chip";
+
+        const main = document.createElement("button");
+        main.type = "button";
+        main.className = "distribution-chip__main";
+        main.dataset.distributionChipOpen = type;
+        main.dataset.distributionItemId = item.id;
+
+        const title = document.createElement("strong");
+        title.className = "distribution-chip__title truncate";
+        title.textContent = getDisplayTitle(type, item);
+
+        const meta = document.createElement("span");
+        meta.className = "distribution-chip__meta truncate";
+        meta.textContent = getDisplayMeta(type, item);
+
+        const copy = document.createElement("span");
+        copy.className = "distribution-chip__copy";
+        copy.append(title, meta);
+        main.appendChild(copy);
+
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "distribution-chip__remove";
+        remove.dataset.distributionChipRemove = type;
+        remove.dataset.distributionItemId = item.id;
+        remove.setAttribute("aria-label", `Quitar ${getDisplayTitle(type, item)}`);
+        remove.innerHTML = '<i class="fa-solid fa-xmark" aria-hidden="true"></i>';
+
+        chip.append(main, remove);
+        chipList.appendChild(chip);
+
+        const hidden = document.createElement("input");
+        hidden.type = "hidden";
+        hidden.name = getInputName(type);
+        hidden.value = item.id;
+        hiddenInputs.appendChild(hidden);
+      });
+    }
+
+    function renderAllFields(scope = document) {
+      scope.querySelectorAll("[data-distribution-field-root]").forEach((root) => {
+        if (root instanceof HTMLElement) {
+          renderField(root);
+        }
+      });
+    }
+
+    function updatePickerSummary(selectedCount, availableCount) {
+      if (!(pickerSummary instanceof HTMLElement)) return;
+      pickerSummary.textContent = `${selectedCount} seleccionados de ${availableCount}`;
+    }
+
+    function syncPickerList() {
+      if (!(pickerList instanceof HTMLElement)) return;
+      if (!activeFieldType || !activeFieldRoot) {
+        renderEmptyState(pickerList, "Selecciona un campo para ver opciones.");
+        updatePickerSummary(0, 0);
+        return;
+      }
+
+      const query = pickerSearch instanceof HTMLInputElement ? pickerSearch.value.trim().toLowerCase() : "";
+      const selectedIds = pendingSelectedIds;
+      const items = getItems(activeFieldType);
+      const filtered = items.filter((item) => {
+        const searchValue =
+          activeFieldType === "contacts"
+            ? `${item.email} ${item.displayName ?? ""} ${item.notes ?? ""} ${item.isActive ? "activa" : "inactiva"}`
+            : `${item.name} ${item.description ?? ""} ${item.memberCount} ${item.members
+                .map((member) => `${member.email} ${member.displayName ?? ""} ${member.notes ?? ""}`)
+                .join(" ")}`;
+        return !query || searchValue.toLowerCase().includes(query);
+      });
+
+      pickerList.replaceChildren();
+      updatePickerSummary(selectedIds.size, items.length);
+
+      if (filtered.length === 0) {
+        renderEmptyState(pickerList, "No encontramos coincidencias.");
+        return;
+      }
+
+      filtered.forEach((item) => {
+        const option = document.createElement("label");
+        option.className = "distribution-picker-item";
+        option.dataset.distributionPickerItem = "true";
+        option.dataset.distributionItemId = item.id;
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = selectedIds.has(item.id);
+        checkbox.dataset.distributionPickerCheckbox = "true";
+
+        const copy = document.createElement("span");
+        copy.className = "distribution-picker-item__copy";
+
+        const title = document.createElement("strong");
+        title.className = "distribution-picker-item__title";
+        title.textContent = getDisplayTitle(activeFieldType, item);
+
+        const meta = document.createElement("span");
+        meta.className = "distribution-picker-item__meta";
+        if (activeFieldType === "contacts") {
+          meta.textContent = `${item.email}${item.displayName ? ` · ${item.displayName}` : ""}`;
+        } else {
+          meta.textContent = `${item.description || "Sin descripcion"} · ${item.memberCount} correos`;
+        }
+
+        copy.append(title, meta);
+        option.append(checkbox, copy);
+        pickerList.appendChild(option);
+      });
+    }
+
+    function openPickerForRoot(root) {
+      if (!(pickerDialog instanceof HTMLDialogElement)) return;
+
+      activeFieldRoot = root;
+      activeFieldType = root.dataset.distributionFieldType || null;
+      if (!activeFieldType) return;
+
+      if (pickerTitle instanceof HTMLElement) {
+        pickerTitle.textContent = activeFieldType === "contacts" ? "Agregar correos de lista" : "Agregar listas de difusión";
+      }
+      if (pickerSubtitle instanceof HTMLElement) {
+        pickerSubtitle.textContent =
+          activeFieldType === "contacts"
+            ? "Elegí los correos cargados que querés enviar con este articulo."
+            : "Elegí una o varias listas de difusión para este articulo.";
+      }
+      if (pickerEyebrow instanceof HTMLElement) {
+        pickerEyebrow.textContent = activeFieldType === "contacts" ? "Correos de lista" : "Listas de difusión";
+      }
+      if (pickerSearch instanceof HTMLInputElement) {
+        pickerSearch.value = "";
+      }
+
+      pendingSelectedIds = new Set(getFieldSelectedIds(root));
+      syncPickerList();
+      pickerDialog.showModal();
+      if (pickerSearch instanceof HTMLInputElement) {
+        pickerSearch.focus();
+      }
+    }
+
+    function renderDetailCard(label, value) {
+      const card = document.createElement("div");
+      card.className = "distribution-detail-card";
+      const caption = document.createElement("p");
+      caption.className = "portal-copy text-xs uppercase tracking-[0.14em]";
+      caption.textContent = label;
+      const strong = document.createElement("strong");
+      strong.className = "mt-2 block text-sm text-white";
+      strong.textContent = value;
+      card.append(caption, strong);
+      return card;
+    }
+
+    function openDetail(type, itemId) {
+      if (!(detailDialog instanceof HTMLDialogElement) || !(detailBody instanceof HTMLElement)) return;
+
+      const item = getItem(type, itemId);
+      if (!item) return;
+
+      if (detailEyebrow instanceof HTMLElement) {
+        detailEyebrow.textContent = type === "contacts" ? "Correo de lista" : "Lista de difusión";
+      }
+      if (detailTitle instanceof HTMLElement) {
+        detailTitle.textContent = getDisplayTitle(type, item);
+      }
+      if (detailSubtitle instanceof HTMLElement) {
+        detailSubtitle.textContent =
+          type === "contacts"
+            ? item.displayName?.trim()
+              ? item.email
+              : "Detalle del correo seleccionado."
+            : item.description || "Detalle de la lista seleccionada.";
+      }
+
+      detailBody.replaceChildren();
+
+      if (type === "contacts") {
+        detailBody.append(
+          renderDetailCard("Email", item.email),
+          renderDetailCard("Nombre visible", item.displayName || "Sin nombre visible"),
+          renderDetailCard("Estado", item.isActive ? "Activo" : "Inactivo"),
+          renderDetailCard("Notas", item.notes || "Sin notas"),
+          renderDetailCard("Actualizacion", item.updatedAt || "Sin fecha")
+        );
+      } else {
+        detailBody.append(
+          renderDetailCard("Estado", item.isActive ? "Activa" : "Inactiva"),
+          renderDetailCard("Correos", `${item.memberCount} correos`),
+          renderDetailCard("Actualizacion", item.updatedAt || "Sin fecha")
+        );
+
+        const membersWrap = document.createElement("div");
+        membersWrap.className = "distribution-detail-card";
+        const caption = document.createElement("p");
+        caption.className = "portal-copy text-xs uppercase tracking-[0.14em]";
+        caption.textContent = "Miembros incluidos";
+        const members = document.createElement("div");
+        members.className = "mt-3 grid gap-2";
+
+        if (item.members.length === 0) {
+          const empty = document.createElement("span");
+          empty.className = "portal-copy text-sm";
+          empty.textContent = "No tiene correos cargados.";
+          members.appendChild(empty);
+        } else {
+          item.members.forEach((member) => {
+            const memberCard = document.createElement("div");
+            memberCard.className = "rounded-2xl border border-white/10 bg-black/20 px-4 py-3";
+
+            const memberTitle = document.createElement("strong");
+            memberTitle.className = "block text-sm text-white";
+            memberTitle.textContent = member.displayName || member.email;
+
+            const memberMeta = document.createElement("p");
+            memberMeta.className = "portal-copy mt-1 text-xs";
+            memberMeta.textContent = member.displayName ? member.email : "Sin nombre visible";
+
+            memberCard.append(memberTitle, memberMeta);
+            members.appendChild(memberCard);
+          });
+        }
+
+        membersWrap.append(caption, members);
+        detailBody.appendChild(membersWrap);
+      }
+
+      detailDialog.showModal();
+    }
+
+    function closeDialog(dialog) {
+      if (dialog instanceof HTMLDialogElement && dialog.open) {
+        dialog.close();
+      }
+    }
+
+    function applyPickerSelection() {
+      if (!activeFieldRoot || !activeFieldType) return;
+      setFieldSelectedIds(activeFieldRoot, Array.from(pendingSelectedIds));
+      closeDialog(pickerDialog);
+    }
+
+    function resetDistributionFields(scope) {
+      if (!(scope instanceof HTMLElement)) return;
+      scope.querySelectorAll("[data-distribution-field-root]").forEach((root) => {
+        if (!(root instanceof HTMLElement)) return;
+        root.dataset.selectedIds = root.dataset.initialSelectedIds || "";
+        renderField(root);
+      });
+    }
+
+    window.resetDistributionFields = resetDistributionFields;
+
+    document.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      const openPickerTrigger = target.closest("[data-distribution-picker-open]");
+      if (openPickerTrigger instanceof HTMLElement) {
+        const root = openPickerTrigger.closest("[data-distribution-field-root]");
+        if (root instanceof HTMLElement) {
+          openPickerForRoot(root);
+        }
+        return;
+      }
+
+      const removeTrigger = target.closest("[data-distribution-chip-remove]");
+      if (removeTrigger instanceof HTMLElement) {
+        const root = removeTrigger.closest("[data-distribution-field-root]");
+        if (!(root instanceof HTMLElement)) return;
+        const itemId = removeTrigger.dataset.distributionItemId || "";
+        const nextIds = getFieldSelectedIds(root).filter((value) => value !== itemId);
+        setFieldSelectedIds(root, nextIds);
+        return;
+      }
+
+      const openDetailTrigger = target.closest("[data-distribution-chip-open]");
+      if (openDetailTrigger instanceof HTMLElement) {
+        const itemId = openDetailTrigger.dataset.distributionItemId || "";
+        const type = openDetailTrigger.dataset.distributionChipOpen || "";
+        if (type === "lists" || type === "contacts") {
+          openDetail(type, itemId);
+        }
+        return;
+      }
+
+      const pickerClose = target.closest("[data-distribution-picker-close]");
+      if (pickerClose instanceof HTMLElement) {
+        closeDialog(pickerDialog);
+        return;
+      }
+
+      const detailClose = target.closest("[data-distribution-detail-close]");
+      if (detailClose instanceof HTMLElement) {
+        closeDialog(detailDialog);
+        return;
+      }
+
+      const pickerSaveTrigger = target.closest("[data-distribution-picker-save]");
+      if (pickerSaveTrigger instanceof HTMLElement) {
+        applyPickerSelection();
+      }
+    });
+
+    document.addEventListener("input", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) return;
+
+      if (target.matches("[data-distribution-picker-search]")) {
+        syncPickerList();
+      }
+    });
+
+    document.addEventListener("change", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement)) return;
+
+      if (target.matches("[data-distribution-picker-checkbox]")) {
+        const item = target.closest("[data-distribution-picker-item]");
+        const itemId = item instanceof HTMLElement ? item.dataset.distributionItemId || "" : "";
+        if (itemId) {
+          if (target.checked) {
+            pendingSelectedIds.add(itemId);
+          } else {
+            pendingSelectedIds.delete(itemId);
+          }
+        }
+        updatePickerSummary(pendingSelectedIds.size, activeFieldType ? getItems(activeFieldType).length : 0);
+      }
+    });
+
+    if (pickerDialog instanceof HTMLDialogElement) {
+      pickerDialog.addEventListener("cancel", () => {
+        closeDialog(pickerDialog);
+      });
+      pickerDialog.addEventListener("click", (event) => {
+        if (event.target === pickerDialog) {
+          closeDialog(pickerDialog);
+        }
+      });
+    }
+
+    if (detailDialog instanceof HTMLDialogElement) {
+      detailDialog.addEventListener("cancel", () => {
+        closeDialog(detailDialog);
+      });
+      detailDialog.addEventListener("click", (event) => {
+        if (event.target === detailDialog) {
+          closeDialog(detailDialog);
+        }
+      });
+    }
+
+    renderAllFields();
+  })();
 </script>
