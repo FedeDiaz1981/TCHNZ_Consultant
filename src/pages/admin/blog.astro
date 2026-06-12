@@ -357,7 +357,7 @@ function formatDateTimeInput(value: string | null) {
                                     Articulo destacado
                                   </label>
 
-                                  <div class="mt-4 rounded-[24px] border border-white/10 bg-white/5 p-4">
+                                  <div class="mt-4 rounded-[24px] border border-white/10 bg-white/5 p-4" data-distribution-root>
                                     <label class="block">
                                       <span class="mb-2 block text-sm font-medium text-white/80">Distribucion por email</span>
                                       <input type="hidden" name="distribution_email_enabled" value="false" />
@@ -368,56 +368,59 @@ function formatDateTimeInput(value: string | null) {
                                           value="true"
                                           checked={post.distributionEmailEnabled}
                                           class="h-4 w-4"
+                                          data-distribution-toggle
                                         />
                                         Enviar este articulo por email a la lista de distribucion al guardar
                                       </label>
                                     </label>
 
-                                    <label class="mt-4 block">
-                                      <span class="mb-2 block text-sm font-medium text-white/80">Correos libres</span>
-                                      <textarea
-                                        class="portal-input min-h-24 w-full rounded-2xl px-4 py-3"
-                                        name="distribution_emails"
-                                        placeholder="articulo1@empresa.com, articulo2@empresa.com"
-                                      >{post.distributionEmails.join("\n")}</textarea>
-                                      <p class="portal-copy mt-2 text-xs">
-                                        Un email por linea o separado por comas.
-                                      </p>
-                                    </label>
-
-                                    <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                                    <div class="mt-4 rounded-[20px] border border-white/10 bg-black/10 p-4" data-distribution-config hidden={!post.distributionEmailEnabled}>
                                       <label class="block">
-                                        <span class="mb-2 block text-sm font-medium text-white/80">Correos cargados</span>
-                                        <select
-                                          class="portal-input min-h-44 w-full rounded-2xl px-4 py-3"
-                                          name="distribution_contact_ids"
-                                          multiple
-                                        >
-                                          {distributionContacts.map((contact) => (
-                                            <option value={contact.id} selected={post.distributionContactIds.includes(contact.id)}>
-                                              {contact.email}
-                                              {contact.displayName ? ` · ${contact.displayName}` : ""}
-                                            </option>
-                                          ))}
-                                        </select>
-                                        <p class="portal-copy mt-2 text-xs">Mantene Ctrl/Cmd para elegir varios correos.</p>
+                                        <span class="mb-2 block text-sm font-medium text-white/80">Correos libres</span>
+                                        <textarea
+                                          class="portal-input min-h-24 w-full rounded-2xl px-4 py-3"
+                                          name="distribution_emails"
+                                          placeholder="articulo1@empresa.com, articulo2@empresa.com"
+                                        >{post.distributionEmails.join("\n")}</textarea>
+                                        <p class="portal-copy mt-2 text-xs">
+                                          Un email por linea o separado por comas.
+                                        </p>
                                       </label>
 
-                                      <label class="block">
-                                        <span class="mb-2 block text-sm font-medium text-white/80">Listas de difusión</span>
-                                        <select
-                                          class="portal-input min-h-44 w-full rounded-2xl px-4 py-3"
-                                          name="distribution_list_ids"
-                                          multiple
-                                        >
-                                          {distributionLists.map((list) => (
-                                            <option value={list.id} selected={post.distributionListIds.includes(list.id)}>
-                                              {list.name} · {list.memberCount} correos
-                                            </option>
-                                          ))}
-                                        </select>
-                                        <p class="portal-copy mt-2 text-xs">Mantene Ctrl/Cmd para elegir varias listas.</p>
-                                      </label>
+                                      <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                                        <label class="block">
+                                          <span class="mb-2 block text-sm font-medium text-white/80">Correos cargados</span>
+                                          <select
+                                            class="portal-input min-h-44 w-full rounded-2xl px-4 py-3"
+                                            name="distribution_contact_ids"
+                                            multiple
+                                          >
+                                            {distributionContacts.map((contact) => (
+                                              <option value={contact.id} selected={post.distributionContactIds.includes(contact.id)}>
+                                                {contact.email}
+                                                {contact.displayName ? ` · ${contact.displayName}` : ""}
+                                              </option>
+                                            ))}
+                                          </select>
+                                          <p class="portal-copy mt-2 text-xs">Mantene Ctrl/Cmd para elegir varios correos.</p>
+                                        </label>
+
+                                        <label class="block">
+                                          <span class="mb-2 block text-sm font-medium text-white/80">Listas de difusión</span>
+                                          <select
+                                            class="portal-input min-h-44 w-full rounded-2xl px-4 py-3"
+                                            name="distribution_list_ids"
+                                            multiple
+                                          >
+                                            {distributionLists.map((list) => (
+                                              <option value={list.id} selected={post.distributionListIds.includes(list.id)}>
+                                                {list.name} · {list.memberCount} correos
+                                              </option>
+                                            ))}
+                                          </select>
+                                          <p class="portal-copy mt-2 text-xs">Mantene Ctrl/Cmd para elegir varias listas.</p>
+                                        </label>
+                                      </div>
                                     </div>
                                   </div>
 
@@ -593,7 +596,7 @@ function formatDateTimeInput(value: string | null) {
             Articulo destacado
           </label>
 
-          <div class="rounded-[28px] border border-white/10 bg-white/5 p-4">
+          <div class="rounded-[28px] border border-white/10 bg-white/5 p-4" data-distribution-root>
             <label class="block">
               <span class="mb-2 block text-sm font-medium text-white/80">Distribucion por email</span>
               <input type="hidden" name="distribution_email_enabled" value="false" />
@@ -603,56 +606,59 @@ function formatDateTimeInput(value: string | null) {
                   name="distribution_email_enabled"
                   value="true"
                   class="h-4 w-4"
+                  data-distribution-toggle
                 />
                 Enviar este articulo por email a la lista de distribucion al guardar
               </label>
             </label>
 
-            <label class="mt-4 block">
-              <span class="mb-2 block text-sm font-medium text-white/80">Correos libres</span>
-              <textarea
-                class="portal-input min-h-24 w-full rounded-2xl px-4 py-3"
-                name="distribution_emails"
-                placeholder="articulo1@empresa.com, articulo2@empresa.com"
-              ></textarea>
-              <p class="portal-copy mt-2 text-xs">
-                Un email por linea o separado por comas.
-              </p>
-            </label>
-
-            <div class="mt-4 grid gap-4 lg:grid-cols-2">
+            <div class="mt-4 rounded-[20px] border border-white/10 bg-black/10 p-4" data-distribution-config hidden>
               <label class="block">
-                <span class="mb-2 block text-sm font-medium text-white/80">Correos cargados</span>
-                <select
-                  class="portal-input min-h-44 w-full rounded-2xl px-4 py-3"
-                  name="distribution_contact_ids"
-                  multiple
-                >
-                  {distributionContacts.map((contact) => (
-                    <option value={contact.id}>
-                      {contact.email}
-                      {contact.displayName ? ` · ${contact.displayName}` : ""}
-                    </option>
-                  ))}
-                </select>
-                <p class="portal-copy mt-2 text-xs">Mantene Ctrl/Cmd para elegir varios correos.</p>
+                <span class="mb-2 block text-sm font-medium text-white/80">Correos libres</span>
+                <textarea
+                  class="portal-input min-h-24 w-full rounded-2xl px-4 py-3"
+                  name="distribution_emails"
+                  placeholder="articulo1@empresa.com, articulo2@empresa.com"
+                ></textarea>
+                <p class="portal-copy mt-2 text-xs">
+                  Un email por linea o separado por comas.
+                </p>
               </label>
 
-              <label class="block">
-                <span class="mb-2 block text-sm font-medium text-white/80">Listas de difusión</span>
-                <select
-                  class="portal-input min-h-44 w-full rounded-2xl px-4 py-3"
-                  name="distribution_list_ids"
-                  multiple
-                >
-                  {distributionLists.map((list) => (
-                    <option value={list.id}>
-                      {list.name} · {list.memberCount} correos
-                    </option>
-                  ))}
-                </select>
-                <p class="portal-copy mt-2 text-xs">Mantene Ctrl/Cmd para elegir varias listas.</p>
-              </label>
+              <div class="mt-4 grid gap-4 lg:grid-cols-2">
+                <label class="block">
+                  <span class="mb-2 block text-sm font-medium text-white/80">Correos cargados</span>
+                  <select
+                    class="portal-input min-h-44 w-full rounded-2xl px-4 py-3"
+                    name="distribution_contact_ids"
+                    multiple
+                  >
+                    {distributionContacts.map((contact) => (
+                      <option value={contact.id}>
+                        {contact.email}
+                        {contact.displayName ? ` · ${contact.displayName}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <p class="portal-copy mt-2 text-xs">Mantene Ctrl/Cmd para elegir varios correos.</p>
+                </label>
+
+                <label class="block">
+                  <span class="mb-2 block text-sm font-medium text-white/80">Listas de difusión</span>
+                  <select
+                    class="portal-input min-h-44 w-full rounded-2xl px-4 py-3"
+                    name="distribution_list_ids"
+                    multiple
+                  >
+                    {distributionLists.map((list) => (
+                      <option value={list.id}>
+                        {list.name} · {list.memberCount} correos
+                      </option>
+                    ))}
+                  </select>
+                  <p class="portal-copy mt-2 text-xs">Mantene Ctrl/Cmd para elegir varias listas.</p>
+                </label>
+              </div>
             </div>
           </div>
           </div>
@@ -1182,6 +1188,23 @@ function formatDateTimeInput(value: string | null) {
 </style>
 
 <script>
+  function syncDistributionConfig(toggle) {
+    if (!(toggle instanceof HTMLInputElement)) return;
+    const root = toggle.closest("[data-distribution-root]");
+    if (!root) return;
+    const config = root.querySelector("[data-distribution-config]");
+    if (!(config instanceof HTMLElement)) return;
+    config.hidden = !toggle.checked;
+  }
+
+  function syncAllDistributionConfigs(scope = document) {
+    scope.querySelectorAll("[data-distribution-toggle]").forEach((toggle) => {
+      if (toggle instanceof HTMLInputElement) {
+        syncDistributionConfig(toggle);
+      }
+    });
+  }
+
   document.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
@@ -1230,7 +1253,16 @@ function formatDateTimeInput(value: string | null) {
           outputNode.value = "";
         }
       });
+
+      syncAllDistributionConfigs(formNode);
     }
+  });
+
+  document.addEventListener("change", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (!target.matches("[data-distribution-toggle]")) return;
+    syncDistributionConfig(target);
   });
 
   document.addEventListener("input", (event) => {
@@ -1255,6 +1287,8 @@ function formatDateTimeInput(value: string | null) {
       emptyState.classList.toggle("hidden", visibleCount > 0);
     }
   });
+
+  syncAllDistributionConfigs();
 
   document.querySelectorAll("dialog[data-admin-dialog]").forEach((dialogNode) => {
     if (!(dialogNode instanceof HTMLDialogElement)) return;
